@@ -2,6 +2,35 @@ import Combine
 @preconcurrency import GoogleMobileAds
 import SwiftUI
 
+public struct CollapseAdsEmptyView: View {
+    @ObservedObject private var manager: AdsKitManager
+    private let slotKey: String
+    private let height: CGFloat
+    @Binding private var isVisible: Bool
+
+    public init(
+        slotKey: String,
+        manager: AdsKitManager,
+        height: CGFloat,
+        isVisible: Binding<Bool>
+    ) {
+        self.slotKey = slotKey
+        self.manager = manager
+        self.height = height
+        self._isVisible = isVisible
+    }
+
+    public var body: some View {
+        if !isVisible || !manager.canDisplay(slotKey: slotKey) {
+            EmptyView()
+        } else {
+            Color.clear
+                .frame(maxWidth: .infinity)
+                .frame(height: height)
+        }
+    }
+}
+
 public struct NativeAdsView: View {
     @ObservedObject private var manager: AdsKitManager
     private let slotKey: String
@@ -33,6 +62,13 @@ public struct NativeAdsView: View {
         manager.nativeViewModel(for: slotKey)
     }
 
+    private var displayHeight: CGFloat {
+        if case .collapse = style {
+            return isCollapsed ? height : calculateExpandedHeight()
+        }
+        return height
+    }
+
     public var body: some View {
         VStack(spacing: 0) {
             if !manager.canDisplay(slotKey: slotKey) {
@@ -48,7 +84,7 @@ public struct NativeAdsView: View {
                         }
                     }
                 )
-                .frame(height: isCollapsed ? max(60, height * 0.35) : height)
+                .frame(height: displayHeight)
                 .background(Color(hex: manager.configuration.theme.cardBackgroundHex))
                 .adsCornerRadius(
                     CGFloat(manager.configuration.theme.largeCornerRadius),
@@ -80,6 +116,11 @@ public struct NativeAdsView: View {
             bindObserver()
             manager.refreshNative(slotKey: slotKey)
         }
+        .onChange(of: observer.nativeAd.map(ObjectIdentifier.init)) { _ in
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isCollapsed = false
+            }
+        }
         .onChange(of: observer.nativeAd != nil) { isLoaded in
             onAdLoaded?.wrappedValue = isLoaded
         }
@@ -96,6 +137,12 @@ public struct NativeAdsView: View {
         guard let viewModel else { return }
         observer.bind(to: viewModel)
     }
+
+    private func calculateExpandedHeight() -> CGFloat {
+        let screenWidth = UIScreen.main.bounds.width
+        let mediaHeight = (screenWidth - 32) * 0.66
+        return height + mediaHeight + 24
+    }
 }
 
 public struct PreloadedNativeAdsView: View {
@@ -106,6 +153,7 @@ public struct PreloadedNativeAdsView: View {
     private let showBorder: Bool
 
     @StateObject private var observer = NativeAdObserver()
+    @State private var isCollapsed = false
 
     public init(
         slotKey: String,
@@ -125,6 +173,13 @@ public struct PreloadedNativeAdsView: View {
         manager.nativeViewModel(for: slotKey)
     }
 
+    private var displayHeight: CGFloat {
+        if case .collapse = style {
+            return isCollapsed ? height : calculateExpandedHeight()
+        }
+        return height
+    }
+
     public var body: some View {
         VStack {
             if !manager.canDisplay(slotKey: slotKey) {
@@ -133,9 +188,14 @@ public struct PreloadedNativeAdsView: View {
                 NativeAdsSwiftUIView(
                     nativeViewModel: viewModel,
                     style: style,
-                    theme: manager.configuration.theme
+                    theme: manager.configuration.theme,
+                    onCollapse: {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            isCollapsed = true
+                        }
+                    }
                 )
-                .frame(height: height)
+                .frame(height: displayHeight)
                 .background(Color(hex: manager.configuration.theme.cardBackgroundHex))
                 .adsCornerRadius(CGFloat(manager.configuration.theme.mediumCornerRadius), corners: .allCorners)
                 .overlay {
@@ -160,6 +220,17 @@ public struct PreloadedNativeAdsView: View {
             observer.bind(to: viewModel)
             manager.preloadNative(slotKey: slotKey)
         }
+        .onChange(of: observer.nativeAd.map(ObjectIdentifier.init)) { _ in
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isCollapsed = false
+            }
+        }
+    }
+
+    private func calculateExpandedHeight() -> CGFloat {
+        let screenWidth = UIScreen.main.bounds.width
+        let mediaHeight = (screenWidth - 32) * 0.66
+        return height + mediaHeight + 24
     }
 }
 

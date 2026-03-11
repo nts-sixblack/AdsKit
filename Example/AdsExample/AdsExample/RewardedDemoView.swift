@@ -4,11 +4,12 @@
 //
 
 import AdsKit
-import SwiftUI
 import GoogleMobileAds
+import SwiftInjected
+import SwiftUI
 
 struct RewardedDemoView: View {
-  @ObservedObject var adsManager: AdsKitManager
+  @InjectedObservable var adsManager: AdsKitManager
 
   @State private var statusMessage = "Tap \"Load\" to load a rewarded ad."
   @State private var isLoaded = false

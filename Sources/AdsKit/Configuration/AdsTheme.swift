@@ -15,6 +15,7 @@ public struct AdsTheme: Codable, Sendable, Hashable {
     public var largeCornerRadius: Double
     public var adBadgeText: String
     public var fontFamilyName: String?
+    public var collapseButton: AdsCollapseButtonConfiguration?
 
     public init(
         cardBackgroundHex: String = "#111111",
@@ -30,7 +31,8 @@ public struct AdsTheme: Codable, Sendable, Hashable {
         mediumCornerRadius: Double = 12,
         largeCornerRadius: Double = 16,
         adBadgeText: String = "Ad",
-        fontFamilyName: String? = nil
+        fontFamilyName: String? = nil,
+        collapseButton: AdsCollapseButtonConfiguration? = nil
     ) {
         self.cardBackgroundHex = cardBackgroundHex
         self.primaryTextHex = primaryTextHex
@@ -46,5 +48,6 @@ public struct AdsTheme: Codable, Sendable, Hashable {
         self.largeCornerRadius = largeCornerRadius
         self.adBadgeText = adBadgeText
         self.fontFamilyName = fontFamilyName
+        self.collapseButton = collapseButton
     }
 }

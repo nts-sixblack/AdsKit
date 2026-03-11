@@ -4,10 +4,11 @@
 //
 
 import AdsKit
+import SwiftInjected
 import SwiftUI
 
 struct AppOpenDemoView: View {
-  @ObservedObject var adsManager: AdsKitManager
+  @InjectedObservable var adsManager: AdsKitManager
 
   @State private var statusMessage = "Tap \"Load\" to load an app open ad."
   @State private var isLoaded = false

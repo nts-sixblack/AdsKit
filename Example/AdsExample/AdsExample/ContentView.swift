@@ -6,10 +6,11 @@
 //
 
 import AdsKit
+import SwiftInjected
 import SwiftUI
 
 struct ContentView: View {
-  @ObservedObject var adsManager: AdsKitManager
+  @InjectedObservable var adsManager: AdsKitManager
 
   var body: some View {
     NavigationStack {
@@ -17,22 +18,25 @@ struct ContentView: View {
         List {
           Section("Inline Ads") {
             NavigationLink("Banner Ad") {
-              BannerDemoView(adsManager: adsManager)
+              BannerDemoView()
+            }
+            NavigationLink("Native Collapse Ad") {
+              NativeCollapseDemoView()
             }
             NavigationLink("Native Ad Styles") {
-              NativeDemoView(adsManager: adsManager)
+              NativeDemoView()
             }
           }
 
           Section("Fullscreen Ads") {
             NavigationLink("Interstitial Ad") {
-              InterstitialDemoView(adsManager: adsManager)
+              InterstitialDemoView()
             }
             NavigationLink("Rewarded Ad") {
-              RewardedDemoView(adsManager: adsManager)
+              RewardedDemoView()
             }
             NavigationLink("App Open Ad") {
-              AppOpenDemoView(adsManager: adsManager)
+              AppOpenDemoView()
             }
           }
         }

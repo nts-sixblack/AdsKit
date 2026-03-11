@@ -4,11 +4,34 @@
 //
 
 import AdsKit
+import SwiftInjected
 
-/// Factory that builds a fully-configured `AdsKitManager` using Google test ad-unit IDs.
+/// Builds and registers a shared `AdsKitManager` using Google test ad-unit IDs.
 @MainActor
-func makeAdsManager() -> AdsKitManager {
-  let configuration = AdsConfiguration(
+func setupDependencies() {
+  let dependencies = Dependencies {
+    Dependency.adsKitManager(
+      configuration: makeAdsConfiguration(),
+      runtimeContext: AdsRuntimeContext(
+        isAdsEnabled: true,
+        isPremiumUser: false,
+        isFirstAppOpen: false
+      ),
+      eventSink: ClosureAdsEventSink { event in
+        print("[AdsKit]", event.kind.rawValue, event.slotKey ?? "-", event.message ?? "")
+      },
+      bootstrap: { manager in
+        manager.startGoogleMobileAds()
+        manager.preloadConfiguredSlots()
+      }
+    )
+  }
+
+  dependencies.build()
+}
+
+private func makeAdsConfiguration() -> AdsConfiguration {
+  AdsConfiguration(
     slots: [
       // Banner
       AdsSlot(
@@ -54,18 +77,29 @@ func makeAdsManager() -> AdsKitManager {
       interstitialKeys: ["demo_inter"],
       nativeKeys: ["demo_native"]
     ),
-    debug: .init(isVerboseLoggingEnabled: true, logSkippedShows: true)
-  )
-
-  return AdsKitManager(
-    configuration: configuration,
-    runtimeContext: AdsRuntimeContext(
-      isAdsEnabled: true,
-      isPremiumUser: false,
-      isFirstAppOpen: false
+    theme: .init(
+      cardBackgroundHex: "#F8FAFC",
+      primaryTextHex: "#0F172A",
+      secondaryTextHex: "#475467",
+      accentHex: "#F6C453",
+      accentTextHex: "#111111",
+      mutedBackgroundHex: "#EEF2F6",
+      mutedTextHex: "#667085",
+      borderHex: "#D0D5DD",
+      borderOpacity: 0.8,
+      collapseButton: .init(
+        symbolName: "chevron.down",
+        iconHex: "#0F172A",
+        backgroundHex: "#FFFFFFE6",
+        borderHex: "#D0D5DD",
+        borderOpacity: 0.95,
+        touchTargetSize: 44,
+        visualSize: 28,
+        iconPointSize: 13,
+        topInset: 10,
+        trailingInset: 10
+      )
     ),
-    eventSink: ClosureAdsEventSink { event in
-      print("[AdsKit]", event.kind.rawValue, event.slotKey ?? "-", event.message ?? "")
-    }
+    debug: .init(isVerboseLoggingEnabled: true, logSkippedShows: true)
   )
 }

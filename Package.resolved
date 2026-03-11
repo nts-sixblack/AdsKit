@@ -1,5 +1,5 @@
 {
-  "originHash" : "5bc90c154ec5f8945380395c333b1cf977dc6c9cf461937fa74409a8ce69e536",
+  "originHash" : "584f1a2eabf2cbb7218cf7538a06ebb19260bd84cda2eb64b345184cdbae2dcf",
   "pins" : [
     {
       "identity" : "swift-package-manager-google-mobile-ads",
@@ -17,6 +17,15 @@
       "state" : {
         "revision" : "13b248eaa73b7826f0efb1bcf455e251d65ecb1b",
         "version" : "3.1.0"
+      }
+    },
+    {
+      "identity" : "swiftinjected",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/nts-sixblack/SwiftInjected.git",
+      "state" : {
+        "revision" : "3b82eaff7ba403f6959e6c1cfba3e632d0b44476",
+        "version" : "1.0.0"
       }
     }
   ],

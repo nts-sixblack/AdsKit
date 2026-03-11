@@ -43,7 +43,15 @@ final class AdsConfigurationTests: XCTestCase {
                 )
             ),
             preload: .init(nativeKeys: ["language_native"]),
-            theme: .init(cardBackgroundHex: "#222222"),
+            theme: .init(
+                cardBackgroundHex: "#222222",
+                collapseButton: .init(
+                    symbolName: "chevron.compact.down",
+                    iconHex: "#000000",
+                    backgroundHex: "#FFFFFF",
+                    borderHex: "#222222"
+                )
+            ),
             debug: .init(isVerboseLoggingEnabled: true, logSkippedShows: false)
         )
 

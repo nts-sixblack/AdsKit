@@ -1,6 +1,6 @@
 # AdsKit
 
-Reusable iOS 16+ Swift Package for AdMob-based ads extracted from the TCGScanner ads module.
+Reusable iOS 16+ Swift Package for AdMob-based ads, designed for reuse across multiple apps.
 
 ## What is included
 
@@ -14,11 +14,12 @@ Reusable iOS 16+ Swift Package for AdMob-based ads extracted from the TCGScanner
 - Fallback placements
 - Runtime-updatable config
 - Pluggable event sink API
+- SwiftInjected integration
 
 ## Installation
 
 1. Add `AdsKit` to your app with Swift Package Manager.
-2. Add the official Google Mobile Ads SDK requirement that `AdsKit` resolves automatically.
+2. `AdsKit` resolves Google Mobile Ads SDK and SwiftInjected automatically.
 3. In the host app, add `GADApplicationIdentifier` and the required `SKAdNetworkItems` to `Info.plist`.
 4. Call `startGoogleMobileAds()` once during startup.
 5. Build your `AdsConfiguration`, then inject runtime state through `AdsRuntimeContext`.
@@ -138,6 +139,45 @@ Use `AdsEventSink` to forward ad events into Firebase, Meta, Adjust, your own an
 final class AnalyticsSink: AdsEventSink {
     func record(_ event: AdsEvent) {
         // Map to your analytics pipeline here.
+    }
+}
+```
+
+## SwiftInjected
+
+`AdsKit` includes a `Dependency.adsKitManager(...)` helper for `SwiftInjected`. Files that use `Dependencies`, `@Injected`, or `@InjectedObservable` should import both `AdsKit` and `SwiftInjected`.
+
+```swift
+import AdsKit
+import SwiftInjected
+
+@MainActor
+func setupDependencies() {
+    let dependencies = Dependencies {
+        Dependency.adsKitManager(
+            configuration: makeAdsConfiguration(),
+            runtimeContext: AdsRuntimeContext(
+                isAdsEnabled: true,
+                isPremiumUser: false,
+                isFirstAppOpen: false
+            ),
+            eventSink: ClosureAdsEventSink { event in
+                print("[AdsKit]", event.kind.rawValue, event.slotKey ?? "-")
+            },
+            bootstrap: { manager in
+                manager.startGoogleMobileAds()
+                manager.preloadConfiguredSlots()
+            }
+        )
+    }
+    dependencies.build()
+}
+
+struct HomeView: View {
+    @InjectedObservable var adsManager: AdsKitManager
+
+    var body: some View {
+        BannerAdsView(slotKey: "home_banner", manager: adsManager)
     }
 }
 ```

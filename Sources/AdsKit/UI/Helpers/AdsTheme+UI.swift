@@ -14,6 +14,7 @@ extension AdsTheme {
     var mutedBackgroundColor: UIColor { uiColor(mutedBackgroundHex) }
     var mutedTextColor: UIColor { uiColor(mutedTextHex) }
     var borderColor: UIColor { uiColor(borderHex).withAlphaComponent(borderOpacity) }
+    var resolvedCollapseButton: AdsCollapseButtonConfiguration { collapseButton ?? .init() }
 
     func font(size: CGFloat, weight: UIFont.Weight) -> UIFont {
         guard let fontFamilyName, let customFont = UIFont(name: fontFamilyName, size: size) else {

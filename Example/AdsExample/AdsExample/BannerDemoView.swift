@@ -4,10 +4,11 @@
 //
 
 import AdsKit
+import SwiftInjected
 import SwiftUI
 
 struct BannerDemoView: View {
-  @ObservedObject var adsManager: AdsKitManager
+  @InjectedObservable var adsManager: AdsKitManager
 
   var body: some View {
     VStack(spacing: 24) {

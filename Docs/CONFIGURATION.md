@@ -63,9 +63,42 @@ Fields:
 - border color and opacity
 - small/medium/large corner radius
 - badge text
+- collapse button styling for `.collapse` native ads
 - optional font family name
 
 If `fontFamilyName` is `nil`, AdsKit uses system fonts.
+
+`AdsTheme.collapseButton` supports:
+
+- `symbolName`
+- `iconHex`
+- `backgroundHex`
+- `borderHex`
+- `borderOpacity`
+- `touchTargetSize`
+- `visualSize`
+- `iconPointSize`
+- `topInset`
+- `trailingInset`
+
+Example:
+
+```swift
+theme: .init(
+    collapseButton: .init(
+        symbolName: "chevron.down",
+        iconHex: "#111111",
+        backgroundHex: "#FFFFFF",
+        borderHex: "#BFC6D7",
+        borderOpacity: 0.35,
+        touchTargetSize: 44,
+        visualSize: 30,
+        iconPointSize: 14,
+        topInset: 8,
+        trailingInset: 16
+    )
+)
+```
 
 ## Debug
 

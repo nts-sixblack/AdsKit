@@ -4,10 +4,11 @@
 //
 
 import AdsKit
+import SwiftInjected
 import SwiftUI
 
 struct NativeDemoView: View {
-  @ObservedObject var adsManager: AdsKitManager
+  @InjectedObservable var adsManager: AdsKitManager
 
   private let styles: [(String, NativeAdViewStyle)] = [
     ("Large", .large()),

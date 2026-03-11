@@ -23,12 +23,26 @@ public struct NativeAdsSwiftUIView: UIViewRepresentable {
     }
 
     public func makeUIView(context: Context) -> NativeAdView {
-        let view = AdsNativeTemplateView(style: style, theme: theme)
-        view.onCollapse = onCollapse
-        return view
+        if case .collapse = style {
+            let view = AdsNativeCollapseView(theme: theme)
+            view.onCollapse = onCollapse
+            return view
+        } else {
+            let view = AdsNativeTemplateView(style: style, theme: theme)
+            view.onCollapse = onCollapse
+            return view
+        }
     }
 
     public func updateUIView(_ nativeAdView: NativeAdView, context: Context) {
+        if let collapseView = nativeAdView as? AdsNativeCollapseView {
+            collapseView.onCollapse = onCollapse
+
+            guard let nativeAd = nativeViewModel.nativeAd else { return }
+            collapseView.apply(nativeAd: nativeAd)
+            return
+        }
+
         if let templateView = nativeAdView as? AdsNativeTemplateView {
             templateView.onCollapse = onCollapse
         }

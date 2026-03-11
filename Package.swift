@@ -18,6 +18,10 @@ let package = Package(
         .package(
             url: "https://github.com/googleads/swift-package-manager-google-mobile-ads.git",
             from: "13.1.0"
+        ),
+        .package(
+            url: "https://github.com/nts-sixblack/SwiftInjected.git",
+            from: "1.0.0"
         )
     ],
     targets: [
@@ -27,6 +31,10 @@ let package = Package(
                 .product(
                     name: "GoogleMobileAds",
                     package: "swift-package-manager-google-mobile-ads"
+                ),
+                .product(
+                    name: "SwiftInjected",
+                    package: "SwiftInjected"
                 )
             ],
             path: "Sources/AdsKit",
