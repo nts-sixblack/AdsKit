@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Show Schemes
+        run: xcodebuild -list
+
+      - name: Build Package
+        run: xcodebuild -scheme AdsKit -destination 'generic/platform=iOS Simulator' build
+
+      - name: Run Tests
+        run: xcodebuild test -scheme AdsKit -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
