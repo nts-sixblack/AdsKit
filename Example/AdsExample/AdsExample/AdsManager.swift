@@ -75,7 +75,7 @@ private func makeAdsConfiguration() -> AdsConfiguration {
     ),
     preload: .init(
       interstitialKeys: ["demo_inter"],
-      nativeKeys: ["demo_native"]
+      manual: .init(nativeKeys: ["demo_native"])
     ),
     theme: .init(
       cardBackgroundHex: "#F8FAFC",

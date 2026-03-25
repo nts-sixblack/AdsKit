@@ -36,7 +36,10 @@ func makeConfiguration(from payload: RemoteAdsPayload) -> AdsConfiguration {
                 )
             )
         ],
-        preload: .init(nativeKeys: ["language_native"])
+        preload: .init(
+            interstitialKeys: ["splash_inter"],
+            manual: .init(nativeKeys: ["language_native"])
+        )
     )
 }
 ```
@@ -57,6 +60,11 @@ adsManager.updateAdsEnabled(payload.adsEnabled)
 adsManager.updatePremiumStatus(payload.premiumUser)
 adsManager.apply(configuration: makeConfiguration(from: payload))
 adsManager.preloadConfiguredSlots()
+
+func openLanguageScreen() {
+    adsManager.preloadManualSlots()
+    // present or navigate to the language screen here
+}
 ```
 
 The same approach works with Firebase Remote Config, LaunchDarkly, local JSON, or your own API.

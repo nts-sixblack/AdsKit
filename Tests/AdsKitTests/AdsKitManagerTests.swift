@@ -39,7 +39,7 @@ final class AdsKitManagerTests: XCTestCase {
         )
     }
 
-    func testNativeViewModelRegistryReusesInstanceUntilConfigurationChanges() {
+    func testNativeViewModelRegistryReusesInstanceWhenConfigurationDoesNotChange() {
         let configuration = makeNativeConfiguration()
         let manager = AdsKitManager(
             configuration: configuration,
@@ -60,11 +60,63 @@ final class AdsKitManagerTests: XCTestCase {
         manager.apply(configuration: configuration)
 
         guard let third = manager.nativeViewModel(for: "feed_native") else {
-            XCTFail("Expected recreated native view model")
+            XCTFail("Expected cached native view model after identical configuration")
             return
         }
 
-        XCTAssertFalse(first === third)
+        XCTAssertTrue(first === third)
+    }
+
+    func testNativeViewModelRegistryRecreatesInstanceWhenNativeSlotChanges() {
+        let manager = AdsKitManager(
+            configuration: makeNativeConfiguration(),
+            runtimeContext: makeRuntimeContext(now: 21)
+        )
+
+        guard let first = manager.nativeViewModel(for: "feed_native") else {
+            XCTFail("Expected first native view model")
+            return
+        }
+
+        manager.apply(
+            configuration: makeNativeConfiguration(primaryPlacementID: "native_primary_updated")
+        )
+
+        guard let second = manager.nativeViewModel(for: "feed_native") else {
+            XCTFail("Expected recreated native view model after slot change")
+            return
+        }
+
+        XCTAssertFalse(first === second)
+    }
+
+    func testNativeViewModelRegistryRecreatesInstanceWhenNativePolicyChanges() {
+        let manager = AdsKitManager(
+            configuration: makeNativeConfiguration(),
+            runtimeContext: makeRuntimeContext(now: 22)
+        )
+
+        guard let first = manager.nativeViewModel(for: "feed_native") else {
+            XCTFail("Expected first native view model")
+            return
+        }
+
+        manager.apply(
+            configuration: makeNativeConfiguration(
+                nativePolicy: .init(
+                    defaultRequestIntervalSeconds: 120,
+                    usesSharedCache: false,
+                    defaultAdChoicesPosition: .bottomLeft
+                )
+            )
+        )
+
+        guard let second = manager.nativeViewModel(for: "feed_native") else {
+            XCTFail("Expected recreated native view model after policy change")
+            return
+        }
+
+        XCTAssertFalse(first === second)
     }
 
     func testCanDisplayRespectsRuntimeFlags() {
@@ -101,16 +153,131 @@ final class AdsKitManagerTests: XCTestCase {
         XCTAssertFalse(manager.canDisplay(slotKey: "launch_app_open"))
     }
 
-    private func makeNativeConfiguration() -> AdsConfiguration {
+    func testPreloadConfiguredSlotsOnlyLoadsStartupBucket() {
+        let sink = RecordingSink()
+        let manager = AdsKitManager(
+            configuration: makeSplitPreloadConfiguration(),
+            runtimeContext: makeRuntimeContext(now: 40),
+            eventSink: sink
+        )
+
+        manager.preloadConfiguredSlots()
+
+        let recordedSlotKeys = Set(sink.events.compactMap(\.slotKey))
+
+        XCTAssertTrue(recordedSlotKeys.contains("startup_inter"))
+        XCTAssertTrue(recordedSlotKeys.contains("startup_rewarded"))
+        XCTAssertTrue(recordedSlotKeys.contains("startup_app_open"))
+        XCTAssertTrue(recordedSlotKeys.contains("startup_native"))
+
+        XCTAssertFalse(recordedSlotKeys.contains("manual_inter"))
+        XCTAssertFalse(recordedSlotKeys.contains("manual_rewarded"))
+        XCTAssertFalse(recordedSlotKeys.contains("manual_app_open"))
+        XCTAssertFalse(recordedSlotKeys.contains("manual_native"))
+    }
+
+    func testPreloadManualSlotsOnlyLoadsManualBucketAndRecordsNativePreloadCreation() {
+        let sink = RecordingSink()
+        let manager = AdsKitManager(
+            configuration: makeSplitPreloadConfiguration(),
+            runtimeContext: makeRuntimeContext(now: 50),
+            eventSink: sink
+        )
+
+        manager.preloadManualSlots()
+
+        let recordedSlotKeys = Set(sink.events.compactMap(\.slotKey))
+
+        XCTAssertTrue(recordedSlotKeys.contains("manual_inter"))
+        XCTAssertTrue(recordedSlotKeys.contains("manual_rewarded"))
+        XCTAssertTrue(recordedSlotKeys.contains("manual_app_open"))
+        XCTAssertTrue(recordedSlotKeys.contains("manual_native"))
+
+        XCTAssertFalse(recordedSlotKeys.contains("startup_inter"))
+        XCTAssertFalse(recordedSlotKeys.contains("startup_rewarded"))
+        XCTAssertFalse(recordedSlotKeys.contains("startup_app_open"))
+        XCTAssertFalse(recordedSlotKeys.contains("startup_native"))
+
+        let manualNativePreloadEvents = sink.events.filter {
+            $0.kind == .preloadCreated && $0.slotKey == "manual_native"
+        }
+        XCTAssertEqual(manualNativePreloadEvents.count, 1)
+    }
+
+    private func makeNativeConfiguration(
+        primaryPlacementID: String = "native_primary",
+        fallbackPlacementID: String = "native_fallback",
+        nativePolicy: AdsNativePolicy = .init()
+    ) -> AdsConfiguration {
         AdsConfiguration(
             slots: [
                 AdsSlot(
                     key: "feed_native",
                     format: .native,
-                    primaryPlacement: .init(id: "native_primary", isEnabled: true),
-                    fallbackPlacement: .init(id: "native_fallback", isEnabled: true)
+                    primaryPlacement: .init(id: primaryPlacementID, isEnabled: true),
+                    fallbackPlacement: .init(id: fallbackPlacementID, isEnabled: true)
                 )
-            ]
+            ],
+            policies: .init(native: nativePolicy)
+        )
+    }
+
+    private func makeSplitPreloadConfiguration() -> AdsConfiguration {
+        AdsConfiguration(
+            slots: [
+                AdsSlot(
+                    key: "startup_inter",
+                    format: .interstitial,
+                    primaryPlacement: .init(id: "startup_interstitial", isEnabled: true)
+                ),
+                AdsSlot(
+                    key: "manual_inter",
+                    format: .interstitial,
+                    primaryPlacement: .init(id: "manual_interstitial", isEnabled: true)
+                ),
+                AdsSlot(
+                    key: "startup_rewarded",
+                    format: .rewarded,
+                    primaryPlacement: .init(id: "startup_rewarded", isEnabled: true)
+                ),
+                AdsSlot(
+                    key: "manual_rewarded",
+                    format: .rewarded,
+                    primaryPlacement: .init(id: "manual_rewarded", isEnabled: true)
+                ),
+                AdsSlot(
+                    key: "startup_app_open",
+                    format: .appOpen,
+                    primaryPlacement: .init(id: "startup_app_open", isEnabled: true)
+                ),
+                AdsSlot(
+                    key: "manual_app_open",
+                    format: .appOpen,
+                    primaryPlacement: .init(id: "manual_app_open", isEnabled: true)
+                ),
+                AdsSlot(
+                    key: "startup_native",
+                    format: .native,
+                    primaryPlacement: .init(id: "startup_native", isEnabled: true)
+                ),
+                AdsSlot(
+                    key: "manual_native",
+                    format: .native,
+                    primaryPlacement: .init(id: "manual_native", isEnabled: true)
+                )
+            ],
+            preload: .init(
+                interstitialKeys: ["startup_inter"],
+                rewardedKeys: ["startup_rewarded"],
+                appOpenKeys: ["startup_app_open"],
+                nativeKeys: ["startup_native"],
+                manual: .init(
+                    interstitialKeys: ["manual_inter"],
+                    rewardedKeys: ["manual_rewarded"],
+                    appOpenKeys: ["manual_app_open"],
+                    nativeKeys: ["manual_native"]
+                )
+            )
         )
     }
 

@@ -137,8 +137,8 @@ final class AdsNativeTemplateView: NativeAdView {
         backgroundCard.addSubview(adTagLabel)
         adTagLabel.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            adTagLabel.topAnchor.constraint(equalTo: backgroundCard.topAnchor, constant: 8),
-            adTagLabel.leadingAnchor.constraint(equalTo: backgroundCard.leadingAnchor, constant: 8)
+            adTagLabel.topAnchor.constraint(equalTo: backgroundCard.topAnchor, constant: 0),
+            adTagLabel.leadingAnchor.constraint(equalTo: backgroundCard.leadingAnchor, constant: 0)
         ])
 
         backgroundCard.addSubview(closeButton)
@@ -149,16 +149,6 @@ final class AdsNativeTemplateView: NativeAdView {
             closeButton.widthAnchor.constraint(equalToConstant: 28),
             closeButton.heightAnchor.constraint(equalToConstant: 28)
         ])
-
-        iconView = headerIconImageView
-        mediaView = mediaAssetView
-        headlineView = headlineLabel
-        bodyView = bodyLabel
-        advertiserView = advertiserLabel
-        storeView = storeLabel
-        priceView = priceLabel
-        starRatingView = starRatingLabel
-        callToActionView = callToActionButton
 
         updateCollapseVisibility()
     }
@@ -233,6 +223,7 @@ final class AdsNativeTemplateView: NativeAdView {
 
     private func makeIconMediaLayout() -> UIView {
         mediaAssetView.heightAnchor.constraint(equalToConstant: 140).isActive = true
+        callToActionButton.heightAnchor.constraint(equalToConstant: 48).isActive = true
         let header = horizontalStack([
             headerIconImageView,
             headlineLabel
@@ -352,5 +343,57 @@ final class AdsNativeTemplateView: NativeAdView {
         stack.spacing = spacing
         stack.alignment = alignment
         return stack
+    }
+
+    func apply(nativeAd: NativeAd) {
+        headlineLabel.text = nativeAd.headline
+        headlineView = headlineLabel
+
+        bodyLabel.text = nativeAd.body
+        bodyLabel.isHidden = nativeAd.body == nil
+        bodyView = bodyLabel.isHidden ? nil : bodyLabel
+
+        headerIconImageView.image = nativeAd.icon?.image
+        headerIconImageView.isHidden = nativeAd.icon == nil
+        iconView = headerIconImageView.isHidden ? nil : headerIconImageView
+
+        starRatingLabel.text = starsString(from: nativeAd.starRating)
+        starRatingLabel.isHidden = starRatingLabel.text?.isEmpty ?? true
+        starRatingView = starRatingLabel.isHidden ? nil : starRatingLabel
+
+        storeLabel.text = nativeAd.store
+        storeLabel.isHidden = nativeAd.store == nil
+        storeView = storeLabel.isHidden ? nil : storeLabel
+
+        priceLabel.text = nativeAd.price
+        priceLabel.isHidden = nativeAd.price == nil
+        priceView = priceLabel.isHidden ? nil : priceLabel
+
+        advertiserLabel.text = nativeAd.advertiser
+        advertiserLabel.isHidden = nativeAd.advertiser == nil
+        advertiserView = advertiserLabel.isHidden ? nil : advertiserLabel
+
+        callToActionButton.setTitle(nativeAd.callToAction, for: .normal)
+        callToActionButton.isHidden = nativeAd.callToAction == nil
+        callToActionView = callToActionButton.isHidden ? nil : callToActionButton
+
+        mediaView = mediaAssetView
+
+        self.nativeAd = nativeAd
+    }
+
+    private func starsString(from starRating: NSDecimalNumber?) -> String {
+        guard let rating = starRating?.doubleValue else {
+            return ""
+        }
+
+        let fullStars = Int(rating)
+        let hasHalfStar = rating - Double(fullStars) >= 0.5
+        let emptyStars = max(0, 5 - fullStars - (hasHalfStar ? 1 : 0))
+
+        let full = String(repeating: "★", count: fullStars)
+        let half = hasHalfStar ? "☆" : ""
+        let empty = String(repeating: "·", count: emptyStars)
+        return full + half + empty
     }
 }

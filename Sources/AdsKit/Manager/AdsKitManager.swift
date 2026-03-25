@@ -45,9 +45,22 @@ public final class AdsKitManager: NSObject, ObservableObject {
     }
 
     public func apply(configuration: AdsConfiguration) {
+        let oldConfiguration = self.configuration
         self.configuration = configuration
         eventReporter.debugOptions = configuration.debug
-        nativeViewModels.removeAll()
+
+        let oldNativePolicy = oldConfiguration.policies.native
+        let newNativePolicy = configuration.policies.native
+
+        let keys = Array(nativeViewModels.keys)
+        for key in keys {
+            let oldSlot = oldConfiguration.slot(forKey: key)
+            let newSlot = configuration.slot(forKey: key)
+            if oldSlot != newSlot || oldNativePolicy != newNativePolicy {
+                nativeViewModels.removeValue(forKey: key)
+            }
+        }
+
         eventReporter.record(
             AdsEvent(
                 kind: .configurationApplied,
@@ -360,10 +373,11 @@ public final class AdsKitManager: NSObject, ObservableObject {
     }
 
     public func preloadConfiguredSlots() {
-        configuration.preload.interstitialKeys.forEach { loadInterstitial(slotKey: $0) }
-        configuration.preload.rewardedKeys.forEach { loadRewarded(slotKey: $0) }
-        configuration.preload.appOpenKeys.forEach { loadAppOpen(slotKey: $0) }
-        configuration.preload.nativeKeys.forEach { preloadNative(slotKey: $0) }
+        preload(slotGroup: configuration.preload.startup)
+    }
+
+    public func preloadManualSlots() {
+        preload(slotGroup: configuration.preload.manual)
     }
 
     public func preloadNative(slotKey: String) {
@@ -458,6 +472,13 @@ public final class AdsKitManager: NSObject, ObservableObject {
             guard !runtimeContext.isFirstAppOpen else { return false }
         }
         return true
+    }
+
+    private func preload(slotGroup: AdsPreloadSlotGroup) {
+        slotGroup.interstitialKeys.forEach { loadInterstitial(slotKey: $0) }
+        slotGroup.rewardedKeys.forEach { loadRewarded(slotKey: $0) }
+        slotGroup.appOpenKeys.forEach { loadAppOpen(slotKey: $0) }
+        slotGroup.nativeKeys.forEach { preloadNative(slotKey: $0) }
     }
 
     private func resolveSlot(

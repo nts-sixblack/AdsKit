@@ -51,7 +51,21 @@ Fields:
 
 ## Preload
 
-`AdsPreloadConfiguration` tells `AdsKitManager.preloadConfiguredSlots()` which slot keys should be preloaded at startup.
+`AdsPreloadConfiguration` has two buckets:
+
+- top-level `interstitialKeys`, `rewardedKeys`, `appOpenKeys`, `nativeKeys`: startup preload keys used by `AdsKitManager.preloadConfiguredSlots()`
+- `manual`: explicit preload keys used by `AdsKitManager.preloadManualSlots()`
+
+You can still preload one native slot directly with `AdsKitManager.preloadNative(slotKey:)`.
+
+Example:
+
+```swift
+preload: .init(
+    interstitialKeys: ["splash_inter"],
+    manual: .init(nativeKeys: ["language_native"])
+)
+```
 
 ## Theme
 

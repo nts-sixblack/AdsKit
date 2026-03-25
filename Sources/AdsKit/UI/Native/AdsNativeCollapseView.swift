@@ -260,7 +260,7 @@ final class AdsNativeCollapseView: NativeAdView {
 
         headlineView = expandedHeadlineLabel
         bodyView = nil
-        callToActionView = expandedCallToActionButton
+        callToActionView = expandedCallToActionButton.isHidden ? nil : expandedCallToActionButton
         iconView = nil
         mediaView = mediaAssetView
     }
@@ -280,9 +280,9 @@ final class AdsNativeCollapseView: NativeAdView {
         floatingAdTagLabel.isHidden = false
 
         headlineView = collapsedHeadlineLabel
-        bodyView = collapsedBodyLabel
-        callToActionView = collapsedCallToActionButton
-        iconView = collapsedIconImageView
+        bodyView = collapsedBodyLabel.isHidden ? nil : collapsedBodyLabel
+        callToActionView = collapsedCallToActionButton.isHidden ? nil : collapsedCallToActionButton
+        iconView = collapsedIconImageView.isHidden ? nil : collapsedIconImageView
         mediaView = nil
     }
 
@@ -320,9 +320,9 @@ final class AdsNativeCollapseView: NativeAdView {
             },
             completion: { _ in
                 self.headlineView = self.collapsedHeadlineLabel
-                self.bodyView = self.collapsedBodyLabel
-                self.callToActionView = self.collapsedCallToActionButton
-                self.iconView = self.collapsedIconImageView
+                self.bodyView = self.collapsedBodyLabel.isHidden ? nil : self.collapsedBodyLabel
+                self.callToActionView = self.collapsedCallToActionButton.isHidden ? nil : self.collapsedCallToActionButton
+                self.iconView = self.collapsedIconImageView.isHidden ? nil : self.collapsedIconImageView
                 self.mediaView = nil
                 self.updateAdRegistration()
                 self.onCollapse?()

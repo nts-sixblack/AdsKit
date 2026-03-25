@@ -26,6 +26,11 @@ struct ContentView: View {
             NavigationLink("Native Ad Styles") {
               NativeDemoView()
             }
+            .simultaneousGesture(
+              TapGesture().onEnded {
+                adsManager.preloadManualSlots()
+              }
+            )
           }
 
           Section("Fullscreen Ads") {

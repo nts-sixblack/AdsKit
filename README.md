@@ -61,7 +61,10 @@ let configuration = AdsConfiguration(
             primaryPlacement: .init(id: "ca-app-pub-3940256099942544/2934735716", isEnabled: true)
         )
     ],
-    preload: .init(nativeKeys: ["language_native"])
+    preload: .init(
+        interstitialKeys: ["splash_inter"],
+        manual: .init(nativeKeys: ["language_native"])
+    )
 )
 
 let adsManager = AdsKitManager(
@@ -78,6 +81,14 @@ let adsManager = AdsKitManager(
 
 adsManager.startGoogleMobileAds()
 adsManager.preloadConfiguredSlots()
+```
+
+Call manual preloads right before the screen that needs them:
+
+```swift
+adsManager.preloadManualSlots()
+// or target one native slot directly
+adsManager.preloadNative(slotKey: "language_native")
 ```
 
 ## SwiftUI usage

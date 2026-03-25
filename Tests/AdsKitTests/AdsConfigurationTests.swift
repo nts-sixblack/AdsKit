@@ -42,7 +42,10 @@ final class AdsConfigurationTests: XCTestCase {
                     autoReloadAfterDismiss: false
                 )
             ),
-            preload: .init(nativeKeys: ["language_native"]),
+            preload: .init(
+                nativeKeys: ["language_native"],
+                manual: .init(nativeKeys: ["manual_native"])
+            ),
             theme: .init(
                 cardBackgroundHex: "#222222",
                 collapseButton: .init(
@@ -59,5 +62,17 @@ final class AdsConfigurationTests: XCTestCase {
         let decoded = try JSONDecoder().decode(AdsConfiguration.self, from: data)
 
         XCTAssertEqual(decoded, configuration)
+    }
+
+    func testPreloadConfigurationDecodesLegacyPayloadWithoutManualBucket() throws {
+        let data = Data(
+            #"{"interstitialKeys":["share_inter"],"nativeKeys":["language_native"]}"#.utf8
+        )
+
+        let decoded = try JSONDecoder().decode(AdsPreloadConfiguration.self, from: data)
+
+        XCTAssertEqual(decoded.interstitialKeys, ["share_inter"])
+        XCTAssertEqual(decoded.nativeKeys, ["language_native"])
+        XCTAssertEqual(decoded.manual, .init())
     }
 }

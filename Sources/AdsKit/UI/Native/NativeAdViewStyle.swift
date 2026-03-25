@@ -37,7 +37,7 @@ public enum NativeAdViewStyle: Equatable {
         case .collapse:
             return 80
         case .iconMedia:
-            return 240
+            return 300
         case .video:
             return 300
         }

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.1
+
+- Split preload configuration into startup and manual buckets, added `AdsPreloadSlotGroup`, and added `AdsKitManager.preloadManualSlots()`.
+- Preserved backward-compatible decoding for preload payloads that do not include the new `manual` bucket.
+- Reused cached native view models when native configuration is unchanged, while still invalidating them when the native slot or native policy changes.
+- Refined native template and collapse views so only visible assets are bound, and increased `.iconMedia` native style height for clearer layouts.
+- Updated the sample app and docs to demonstrate startup preload versus manual preload before entering native ad screens.
+
 ## 1.0.0
 
 - First stable release of `AdsKit`.
