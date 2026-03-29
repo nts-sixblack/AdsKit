@@ -64,9 +64,14 @@ public struct NativeAdsView: View {
 
     private var displayHeight: CGFloat {
         if case .collapse = style {
+            guard hasLoadedPrimaryMedia else { return height }
             return isCollapsed ? height : calculateExpandedHeight()
         }
         return height
+    }
+
+    private var hasLoadedPrimaryMedia: Bool {
+        AdsNativeMediaSupport.hasPrimaryMedia(in: observer.nativeAd?.mediaContent)
     }
 
     public var body: some View {
@@ -175,9 +180,14 @@ public struct PreloadedNativeAdsView: View {
 
     private var displayHeight: CGFloat {
         if case .collapse = style {
+            guard hasLoadedPrimaryMedia else { return height }
             return isCollapsed ? height : calculateExpandedHeight()
         }
         return height
+    }
+
+    private var hasLoadedPrimaryMedia: Bool {
+        AdsNativeMediaSupport.hasPrimaryMedia(in: observer.nativeAd?.mediaContent)
     }
 
     public var body: some View {

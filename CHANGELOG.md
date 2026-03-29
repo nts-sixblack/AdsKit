@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.2
+
+- Fixed collapse native ads so media-backed creatives are detected from `mainImage` or video instead of `aspectRatio`, preventing false banner fallback when the aspect ratio is unknown.
+- Kept a `MediaView` bound in the compact collapsed state for media-backed native ads to satisfy AdMob native validator requirements.
+- Updated collapse native container height logic to render no-media ads directly at compact height without a transient expanded frame.
+- Added focused coverage for native media detection behavior.
+
 ## 1.0.1
 
 - Split preload configuration into startup and manual buckets, added `AdsPreloadSlotGroup`, and added `AdsKitManager.preloadManualSlots()`.

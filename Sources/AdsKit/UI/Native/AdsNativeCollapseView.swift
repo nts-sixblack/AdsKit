@@ -16,6 +16,7 @@ final class AdsNativeCollapseView: NativeAdView {
     private let expandedAdTagLabel = PaddingLabel()
     private let expandedHeadlineLabel = UILabel()
     private let expandedCallToActionButton = UIButton(type: .system)
+    private let collapsedMediaAssetView = MediaView()
     private let collapsedIconImageView = UIImageView()
     private let collapsedHeadlineLabel = UILabel()
     private let collapsedBodyLabel = UILabel()
@@ -26,8 +27,7 @@ final class AdsNativeCollapseView: NativeAdView {
     private let collapsedBottomStack = UIStackView()
 
     private var appliedNativeAd: NativeAd?
-    private var isMediaCollapsed = false
-    private var isFullyCollapsed = false
+    private var hasPrimaryMediaAsset = false
 
     init(theme: AdsTheme) {
         self.theme = theme
@@ -46,11 +46,12 @@ final class AdsNativeCollapseView: NativeAdView {
         appliedNativeAd = nativeAd
 
         populateContent(with: nativeAd)
+        hasPrimaryMediaAsset = AdsNativeMediaSupport.hasPrimaryMedia(in: nativeAd.mediaContent)
 
-        if hasMediaContent(nativeAd) {
+        if hasPrimaryMediaAsset {
             showExpandedState()
         } else {
-            showCollapsedState()
+            showCompactState()
             DispatchQueue.main.async { [weak self] in
                 self?.onCollapse?()
             }
@@ -137,6 +138,16 @@ final class AdsNativeCollapseView: NativeAdView {
             collapsedIconImageView.heightAnchor.constraint(equalToConstant: 40)
         ])
 
+        collapsedMediaAssetView.contentMode = .scaleAspectFill
+        collapsedMediaAssetView.layer.cornerRadius = CGFloat(theme.mediumCornerRadius)
+        collapsedMediaAssetView.clipsToBounds = true
+        collapsedMediaAssetView.isHidden = true
+        collapsedMediaAssetView.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            collapsedMediaAssetView.widthAnchor.constraint(equalToConstant: 56),
+            collapsedMediaAssetView.heightAnchor.constraint(equalToConstant: 56)
+        ])
+
         collapsedHeadlineLabel.font = theme.font(size: 15, weight: .bold)
         collapsedHeadlineLabel.textColor = theme.primaryTextColor
         collapsedHeadlineLabel.numberOfLines = 1
@@ -167,6 +178,7 @@ final class AdsNativeCollapseView: NativeAdView {
         collapsedBottomStack.axis = .horizontal
         collapsedBottomStack.spacing = 12
         collapsedBottomStack.alignment = .center
+        collapsedBottomStack.addArrangedSubview(collapsedMediaAssetView)
         collapsedBottomStack.addArrangedSubview(collapsedIconImageView)
         collapsedBottomStack.addArrangedSubview(collapsedTextStack)
         collapsedBottomStack.addArrangedSubview(collapsedCallToActionButton)
@@ -234,20 +246,12 @@ final class AdsNativeCollapseView: NativeAdView {
         collapsedCallToActionButton.setTitle(nativeAd.callToAction, for: .normal)
         collapsedCallToActionButton.isHidden = nativeAd.callToAction == nil
         collapsedIconImageView.image = nativeAd.icon?.image
-        collapsedIconImageView.isHidden = nativeAd.icon == nil
 
         mediaAssetView.mediaContent = nativeAd.mediaContent
-    }
-
-    private func hasMediaContent(_ nativeAd: NativeAd) -> Bool {
-        let mediaContent = nativeAd.mediaContent
-        return mediaContent.aspectRatio > 0 && (mediaContent.hasVideoContent || mediaContent.mainImage != nil)
+        collapsedMediaAssetView.mediaContent = nativeAd.mediaContent
     }
 
     private func showExpandedState() {
-        isMediaCollapsed = false
-        isFullyCollapsed = false
-
         mediaContainerView.isHidden = false
         mediaContainerView.alpha = 1
         mediaAssetView.isHidden = false
@@ -257,6 +261,9 @@ final class AdsNativeCollapseView: NativeAdView {
         collapsedBottomStack.isHidden = true
         collapsedBottomStack.alpha = 0
         floatingAdTagLabel.isHidden = true
+        collapsedMediaAssetView.isHidden = true
+        collapsedMediaAssetView.alpha = 0
+        collapsedIconImageView.isHidden = true
 
         headlineView = expandedHeadlineLabel
         bodyView = nil
@@ -265,10 +272,7 @@ final class AdsNativeCollapseView: NativeAdView {
         mediaView = mediaAssetView
     }
 
-    private func showCollapsedState() {
-        isMediaCollapsed = true
-        isFullyCollapsed = true
-
+    private func showCompactState() {
         mediaAssetView.isHidden = true
         mediaAssetView.alpha = 0
         mediaContainerView.isHidden = true
@@ -278,12 +282,15 @@ final class AdsNativeCollapseView: NativeAdView {
         collapsedBottomStack.isHidden = false
         collapsedBottomStack.alpha = 1
         floatingAdTagLabel.isHidden = false
+        collapsedMediaAssetView.isHidden = !hasPrimaryMediaAsset
+        collapsedMediaAssetView.alpha = hasPrimaryMediaAsset ? 1 : 0
+        collapsedIconImageView.isHidden = hasPrimaryMediaAsset || collapsedIconImageView.image == nil
 
         headlineView = collapsedHeadlineLabel
         bodyView = collapsedBodyLabel.isHidden ? nil : collapsedBodyLabel
         callToActionView = collapsedCallToActionButton.isHidden ? nil : collapsedCallToActionButton
         iconView = collapsedIconImageView.isHidden ? nil : collapsedIconImageView
-        mediaView = nil
+        mediaView = hasPrimaryMediaAsset ? collapsedMediaAssetView : nil
     }
 
     private func updateAdRegistration() {
@@ -292,38 +299,25 @@ final class AdsNativeCollapseView: NativeAdView {
     }
 
     @objc private func handleCollapse() {
-        guard let appliedNativeAd, hasMediaContent(appliedNativeAd) else { return }
+        guard hasPrimaryMediaAsset else { return }
 
-        if !isMediaCollapsed {
-            isMediaCollapsed = true
-            UIView.animate(withDuration: 0.3) {
-                self.mediaAssetView.isHidden = true
-                self.mediaAssetView.alpha = 0
-            }
-            return
-        }
-
-        guard !isFullyCollapsed else { return }
-        isFullyCollapsed = true
+        collapsedMediaAssetView.isHidden = false
+        collapsedIconImageView.isHidden = true
+        collapsedBottomStack.isHidden = false
+        collapsedBottomStack.alpha = 0
 
         UIView.animate(
             withDuration: 0.3,
             animations: {
-                self.mediaContainerView.isHidden = true
                 self.mediaContainerView.alpha = 0
                 self.expandedBottomStack.isHidden = true
                 self.expandedBottomStack.alpha = 0
-                self.collapsedBottomStack.isHidden = false
                 self.collapsedBottomStack.alpha = 1
                 self.floatingAdTagLabel.isHidden = false
                 self.layoutIfNeeded()
             },
             completion: { _ in
-                self.headlineView = self.collapsedHeadlineLabel
-                self.bodyView = self.collapsedBodyLabel.isHidden ? nil : self.collapsedBodyLabel
-                self.callToActionView = self.collapsedCallToActionButton.isHidden ? nil : self.collapsedCallToActionButton
-                self.iconView = self.collapsedIconImageView.isHidden ? nil : self.collapsedIconImageView
-                self.mediaView = nil
+                self.showCompactState()
                 self.updateAdRegistration()
                 self.onCollapse?()
             }
