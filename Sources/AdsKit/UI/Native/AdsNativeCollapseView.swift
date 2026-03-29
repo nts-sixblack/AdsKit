@@ -2,16 +2,19 @@
 import UIKit
 
 final class AdsNativeCollapseView: NativeAdView {
+    private static let collapseChevronAssetNames = ["down-arrow", "AdsNativeCollapseChevron"]
+
     var onCollapse: (() -> Void)?
 
-    private let theme: AdsTheme
-    private let collapseButtonConfiguration: AdsCollapseButtonConfiguration
+    private var theme: AdsTheme
+    private var collapseButtonConfiguration: AdsCollapseButtonConfiguration
 
     private let backgroundCard = UIView()
     private let mediaContainerView = UIView()
     private let mediaAssetView = MediaView()
-    private let collapseButton = UIButton(type: .system)
+    private let collapseButton = UIButton(type: .custom)
     private let collapseButtonBackground = UIView()
+    private let collapseButtonIconView = UIImageView()
     private let floatingAdTagLabel = PaddingLabel()
     private let expandedAdTagLabel = PaddingLabel()
     private let expandedHeadlineLabel = UILabel()
@@ -28,6 +31,8 @@ final class AdsNativeCollapseView: NativeAdView {
 
     private var appliedNativeAd: NativeAd?
     private var hasPrimaryMediaAsset = false
+    private var collapseButtonIconWidthConstraint: NSLayoutConstraint?
+    private var collapseButtonIconHeightConstraint: NSLayoutConstraint?
 
     init(theme: AdsTheme) {
         self.theme = theme
@@ -60,19 +65,23 @@ final class AdsNativeCollapseView: NativeAdView {
         updateAdRegistration()
     }
 
+    func apply(theme: AdsTheme) {
+        self.theme = theme
+        collapseButtonConfiguration = theme.resolvedCollapseButton
+        refreshTheme()
+    }
+
     private func setupViews() {
         backgroundColor = .clear
         clipsToBounds = false
 
-        backgroundCard.backgroundColor = theme.cardBackgroundColor
-        backgroundCard.layer.cornerRadius = CGFloat(theme.largeCornerRadius)
-        backgroundCard.layer.borderWidth = 1
-        backgroundCard.layer.borderColor = theme.borderColor.cgColor
         addSubview(backgroundCard)
         backgroundCard.adsPinEdges(to: self)
 
         configureAdTag(floatingAdTagLabel)
         configureAdTag(expandedAdTagLabel)
+        setupAdTagLayout(floatingAdTagLabel)
+        setupAdTagLayout(expandedAdTagLabel)
 
         mediaAssetView.contentMode = .scaleAspectFill
         mediaAssetView.clipsToBounds = true
@@ -83,29 +92,26 @@ final class AdsNativeCollapseView: NativeAdView {
             multiplier: 0.6
         ).isActive = true
 
-        let buttonConfig = UIImage.SymbolConfiguration(
-            pointSize: CGFloat(collapseButtonConfiguration.iconPointSize),
-            weight: .bold
-        )
-        collapseButton.setImage(
-            UIImage(systemName: collapseButtonConfiguration.symbolName, withConfiguration: buttonConfig),
-            for: .normal
-        )
-        collapseButton.tintColor = UIColor(hex: collapseButtonConfiguration.iconHex)
         collapseButton.addTarget(self, action: #selector(handleCollapse), for: .touchUpInside)
         collapseButton.translatesAutoresizingMaskIntoConstraints = false
 
-        collapseButtonBackground.backgroundColor = UIColor(hex: collapseButtonConfiguration.backgroundHex)
-        collapseButtonBackground.layer.cornerRadius = CGFloat(collapseButtonConfiguration.visualSize) / 2
-        collapseButtonBackground.layer.borderWidth = 1
-        collapseButtonBackground.layer.borderColor = UIColor(hex: collapseButtonConfiguration.borderHex)
-            .withAlphaComponent(collapseButtonConfiguration.borderOpacity)
-            .cgColor
         collapseButtonBackground.isUserInteractionEnabled = false
         collapseButton.insertSubview(collapseButtonBackground, at: 0)
         collapseButtonBackground.translatesAutoresizingMaskIntoConstraints = false
 
+        collapseButtonIconView.isUserInteractionEnabled = false
+        collapseButtonIconView.contentMode = .scaleAspectFit
+        collapseButtonIconView.translatesAutoresizingMaskIntoConstraints = false
+        collapseButton.addSubview(collapseButtonIconView)
+
         mediaContainerView.addSubview(collapseButton)
+        collapseButtonIconWidthConstraint = collapseButtonIconView.widthAnchor.constraint(
+            equalToConstant: collapseButtonIconDisplaySize()
+        )
+        collapseButtonIconHeightConstraint = collapseButtonIconView.heightAnchor.constraint(
+            equalToConstant: collapseButtonIconDisplaySize()
+        )
+
         NSLayoutConstraint.activate([
             collapseButton.topAnchor.constraint(
                 equalTo: mediaContainerView.topAnchor,
@@ -120,17 +126,19 @@ final class AdsNativeCollapseView: NativeAdView {
             collapseButtonBackground.centerXAnchor.constraint(equalTo: collapseButton.centerXAnchor),
             collapseButtonBackground.centerYAnchor.constraint(equalTo: collapseButton.centerYAnchor),
             collapseButtonBackground.widthAnchor.constraint(equalToConstant: CGFloat(collapseButtonConfiguration.visualSize)),
-            collapseButtonBackground.heightAnchor.constraint(equalToConstant: CGFloat(collapseButtonConfiguration.visualSize))
+            collapseButtonBackground.heightAnchor.constraint(equalToConstant: CGFloat(collapseButtonConfiguration.visualSize)),
+            collapseButtonIconView.centerXAnchor.constraint(equalTo: collapseButton.centerXAnchor),
+            collapseButtonIconView.centerYAnchor.constraint(equalTo: collapseButton.centerYAnchor),
+            collapseButtonIconWidthConstraint!,
+            collapseButtonIconHeightConstraint!
         ])
 
-        expandedHeadlineLabel.font = theme.font(size: 15, weight: .medium)
-        expandedHeadlineLabel.textColor = theme.primaryTextColor
         expandedHeadlineLabel.numberOfLines = 1
 
         configureCallToActionButton(expandedCallToActionButton, fontSize: 16)
+        setupCallToActionButtonLayout(expandedCallToActionButton)
 
         collapsedIconImageView.contentMode = .scaleAspectFit
-        collapsedIconImageView.layer.cornerRadius = CGFloat(theme.smallCornerRadius)
         collapsedIconImageView.clipsToBounds = true
         collapsedIconImageView.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
@@ -139,7 +147,6 @@ final class AdsNativeCollapseView: NativeAdView {
         ])
 
         collapsedMediaAssetView.contentMode = .scaleAspectFill
-        collapsedMediaAssetView.layer.cornerRadius = CGFloat(theme.mediumCornerRadius)
         collapsedMediaAssetView.clipsToBounds = true
         collapsedMediaAssetView.isHidden = true
         collapsedMediaAssetView.translatesAutoresizingMaskIntoConstraints = false
@@ -148,15 +155,12 @@ final class AdsNativeCollapseView: NativeAdView {
             collapsedMediaAssetView.heightAnchor.constraint(equalToConstant: 56)
         ])
 
-        collapsedHeadlineLabel.font = theme.font(size: 15, weight: .bold)
-        collapsedHeadlineLabel.textColor = theme.primaryTextColor
         collapsedHeadlineLabel.numberOfLines = 1
 
-        collapsedBodyLabel.font = theme.font(size: 14, weight: .regular)
-        collapsedBodyLabel.textColor = theme.secondaryTextColor
         collapsedBodyLabel.numberOfLines = 2
 
         configureCallToActionButton(collapsedCallToActionButton, fontSize: 14)
+        setupCallToActionButtonLayout(collapsedCallToActionButton)
         collapsedCallToActionButton.contentEdgeInsets = UIEdgeInsets(top: 8, left: 24, bottom: 8, right: 24)
 
         let expandedTitleRow = horizontalStack(
@@ -202,6 +206,8 @@ final class AdsNativeCollapseView: NativeAdView {
             floatingAdTagLabel.leadingAnchor.constraint(equalTo: backgroundCard.leadingAnchor, constant: 8)
         ])
         floatingAdTagLabel.isHidden = true
+
+        refreshTheme()
     }
 
     private func configureAdTag(_ label: PaddingLabel) {
@@ -218,6 +224,9 @@ final class AdsNativeCollapseView: NativeAdView {
         label.rightInset = 5
         label.setContentCompressionResistancePriority(.required, for: .horizontal)
         label.setContentHuggingPriority(.required, for: .horizontal)
+    }
+
+    private func setupAdTagLayout(_ label: PaddingLabel) {
         label.translatesAutoresizingMaskIntoConstraints = false
         label.heightAnchor.constraint(equalToConstant: 16).isActive = true
         label.widthAnchor.constraint(greaterThanOrEqualToConstant: 24).isActive = true
@@ -229,10 +238,81 @@ final class AdsNativeCollapseView: NativeAdView {
         button.backgroundColor = theme.accentColor
         button.layer.cornerRadius = 24
         button.clipsToBounds = true
-        button.translatesAutoresizingMaskIntoConstraints = false
-        button.heightAnchor.constraint(equalToConstant: 48).isActive = true
         button.setContentCompressionResistancePriority(.required, for: .horizontal)
         button.setContentHuggingPriority(.required, for: .horizontal)
+    }
+
+    private func setupCallToActionButtonLayout(_ button: UIButton) {
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.heightAnchor.constraint(equalToConstant: 48).isActive = true
+    }
+
+    private func refreshTheme() {
+        backgroundCard.backgroundColor = theme.cardBackgroundColor
+        backgroundCard.layer.cornerRadius = CGFloat(theme.largeCornerRadius)
+        backgroundCard.layer.borderWidth = 1
+        backgroundCard.layer.borderColor = theme.borderColor.cgColor
+
+        configureAdTag(floatingAdTagLabel)
+        configureAdTag(expandedAdTagLabel)
+
+        expandedHeadlineLabel.font = theme.font(size: 15, weight: .medium)
+        expandedHeadlineLabel.textColor = theme.primaryTextColor
+
+        collapsedHeadlineLabel.font = theme.font(size: 15, weight: .bold)
+        collapsedHeadlineLabel.textColor = theme.primaryTextColor
+
+        collapsedBodyLabel.font = theme.font(size: 14, weight: .regular)
+        collapsedBodyLabel.textColor = theme.secondaryTextColor
+
+        configureCallToActionButton(expandedCallToActionButton, fontSize: 16)
+        configureCallToActionButton(collapsedCallToActionButton, fontSize: 14)
+
+        collapsedIconImageView.layer.cornerRadius = CGFloat(theme.smallCornerRadius)
+        collapsedMediaAssetView.layer.cornerRadius = CGFloat(theme.mediumCornerRadius)
+
+        let iconColor = UIColor(hex: collapseButtonConfiguration.iconHex)
+        let buttonImage = collapseButtonImage()
+        collapseButton.adjustsImageWhenHighlighted = false
+        collapseButton.tintColor = iconColor
+        collapseButtonIconView.tintColor = iconColor
+        collapseButtonIconView.image = buttonImage
+        collapseButtonIconWidthConstraint?.constant = collapseButtonIconDisplaySize()
+        collapseButtonIconHeightConstraint?.constant = collapseButtonIconDisplaySize()
+        collapseButton.bringSubviewToFront(collapseButtonIconView)
+
+        collapseButtonBackground.backgroundColor = UIColor(hex: collapseButtonConfiguration.backgroundHex)
+        collapseButtonBackground.layer.cornerRadius = CGFloat(collapseButtonConfiguration.visualSize) / 2
+        collapseButtonBackground.layer.borderWidth = 1
+        collapseButtonBackground.layer.borderColor = UIColor(hex: collapseButtonConfiguration.borderHex)
+            .withAlphaComponent(collapseButtonConfiguration.borderOpacity)
+            .cgColor
+    }
+
+    private func collapseButtonImage() -> UIImage? {
+        for assetName in Self.collapseChevronAssetNames {
+            if let assetImage = AdsKitImageAsset.image(
+                named: assetName,
+                compatibleWith: traitCollection
+            ) {
+                return assetImage.withRenderingMode(.alwaysTemplate)
+            }
+        }
+
+        let symbolConfig = UIImage.SymbolConfiguration(
+            pointSize: collapseButtonIconDisplaySize(),
+            weight: .bold
+        )
+        return UIImage(
+            systemName: collapseButtonConfiguration.symbolName,
+            withConfiguration: symbolConfig
+        )?.withRenderingMode(.alwaysTemplate)
+    }
+
+    private func collapseButtonIconDisplaySize() -> CGFloat {
+        let requestedSize = CGFloat(collapseButtonConfiguration.iconPointSize) + 2
+        let maxAllowedSize = max(0, CGFloat(collapseButtonConfiguration.visualSize) - 8)
+        return min(requestedSize, maxAllowedSize)
     }
 
     private func populateContent(with nativeAd: NativeAd) {

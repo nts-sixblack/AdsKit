@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.3
+
+- Fixed collapse native button rendering so the chevron icon is drawn through a dedicated image view instead of relying on `UIButton` image layout, which restores reliable tinting and visibility.
+- Added package-aware asset loading for collapse button icons so image resources resolve correctly when `AdsKit` is consumed through Swift Package Manager.
+- Applied collapse native theme updates during `UIViewRepresentable` refreshes and slightly increased the default collapse icon display size for better legibility.
+
 ## 1.0.2
 
 - Fixed collapse native ads so media-backed creatives are detected from `mainImage` or video instead of `aspectRatio`, preventing false banner fallback when the aspect ratio is unknown.

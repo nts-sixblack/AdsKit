@@ -39,7 +39,9 @@ let package = Package(
             ],
             path: "Sources/AdsKit",
             resources: [
-                .process("Resources")
+                .process("Resources/Media.xcassets"),
+                .process("Resources/Assets.xcassets"),
+                .copy("Resources/PackageMetadata.json")
             ]
         ),
         .testTarget(

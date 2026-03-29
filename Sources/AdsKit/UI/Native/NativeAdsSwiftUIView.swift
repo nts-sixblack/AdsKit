@@ -37,6 +37,7 @@ public struct NativeAdsSwiftUIView: UIViewRepresentable {
     public func updateUIView(_ nativeAdView: NativeAdView, context: Context) {
         if let collapseView = nativeAdView as? AdsNativeCollapseView {
             collapseView.onCollapse = onCollapse
+            collapseView.apply(theme: theme)
 
             guard let nativeAd = nativeViewModel.nativeAd else { return }
             collapseView.apply(nativeAd: nativeAd)
