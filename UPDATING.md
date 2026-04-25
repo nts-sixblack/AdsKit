@@ -1,5 +1,11 @@
 # Updating AdsKit
 
+## From 1.0.3 to 1.0.4
+
+- No API migration is required.
+- Collapse native ads now prioritize the native ad icon in the compact collapsed row instead of showing or reserving a media thumbnail slot before the headline.
+- Re-check any screenshot baselines or custom visual QA around `.collapse` native ads.
+
 ## From 0.1.x to 1.0.0
 
 - Review the changelog before bumping the version.

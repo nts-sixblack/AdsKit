@@ -10,6 +10,7 @@ Reusable iOS 16+ Swift Package for AdMob-based ads, designed for reuse across mu
 - Rewarded ads
 - App open ads
 - Native ads with multiple built-in styles
+- Collapse native ads with an expanded media state and compact ad-icon row
 - Native preload/cache support
 - Fallback placements
 - Runtime-updatable config
@@ -141,6 +142,8 @@ final class HomeViewController: UIViewController {
 ```
 
 For banner/native content on UIKit screens, embed `BannerAdsView` or `NativeAdsView` with `UIHostingController`, or bind `NativeAdViewModel` into your own `UIView` container if you need a custom layout.
+
+`NativeAdViewStyle.collapse` starts expanded when the ad has primary media. After collapse, the compact row shows the ad icon before the headline and hides the media thumbnail from layout, while still keeping media registered for Google Mobile Ads validation.
 
 ## Events
 

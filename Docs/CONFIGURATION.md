@@ -82,6 +82,8 @@ preload: .init(
 
 If `fontFamilyName` is `nil`, AdsKit uses system fonts.
 
+For `.collapse` native ads, media-backed creatives open in an expanded media layout. The collapsed compact row shows the native ad icon before the headline when one is available; if the icon is missing, AdsKit removes that leading asset from layout instead of leaving an empty placeholder.
+
 `AdsTheme.collapseButton` supports:
 
 - `symbolName`

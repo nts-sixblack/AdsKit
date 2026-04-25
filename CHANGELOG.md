@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.4
+
+- Fixed collapse native ads so the compact collapsed row shows the ad icon before the headline instead of reserving a media thumbnail slot.
+- Hidden the compact `MediaView` from layout while keeping it registered for media-backed native ads.
+- Updated docs to clarify collapse native compact-row behavior.
+
 ## 1.0.3
 
 - Fixed collapse native button rendering so the chevron icon is drawn through a dedicated image view instead of relying on `UIButton` image layout, which restores reliable tinting and visibility.

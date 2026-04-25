@@ -353,6 +353,8 @@ final class AdsNativeCollapseView: NativeAdView {
     }
 
     private func showCompactState() {
+        let hasCollapsedIcon = collapsedIconImageView.image != nil
+
         mediaAssetView.isHidden = true
         mediaAssetView.alpha = 0
         mediaContainerView.isHidden = true
@@ -362,14 +364,15 @@ final class AdsNativeCollapseView: NativeAdView {
         collapsedBottomStack.isHidden = false
         collapsedBottomStack.alpha = 1
         floatingAdTagLabel.isHidden = false
-        collapsedMediaAssetView.isHidden = !hasPrimaryMediaAsset
-        collapsedMediaAssetView.alpha = hasPrimaryMediaAsset ? 1 : 0
-        collapsedIconImageView.isHidden = hasPrimaryMediaAsset || collapsedIconImageView.image == nil
+        collapsedMediaAssetView.isHidden = true
+        collapsedMediaAssetView.alpha = 0
+        collapsedIconImageView.isHidden = !hasCollapsedIcon
+        collapsedIconImageView.alpha = hasCollapsedIcon ? 1 : 0
 
         headlineView = collapsedHeadlineLabel
         bodyView = collapsedBodyLabel.isHidden ? nil : collapsedBodyLabel
         callToActionView = collapsedCallToActionButton.isHidden ? nil : collapsedCallToActionButton
-        iconView = collapsedIconImageView.isHidden ? nil : collapsedIconImageView
+        iconView = hasCollapsedIcon ? collapsedIconImageView : nil
         mediaView = hasPrimaryMediaAsset ? collapsedMediaAssetView : nil
     }
 
@@ -381,8 +384,11 @@ final class AdsNativeCollapseView: NativeAdView {
     @objc private func handleCollapse() {
         guard hasPrimaryMediaAsset else { return }
 
-        collapsedMediaAssetView.isHidden = false
-        collapsedIconImageView.isHidden = true
+        let hasCollapsedIcon = collapsedIconImageView.image != nil
+        collapsedMediaAssetView.isHidden = true
+        collapsedMediaAssetView.alpha = 0
+        collapsedIconImageView.isHidden = !hasCollapsedIcon
+        collapsedIconImageView.alpha = hasCollapsedIcon ? 1 : 0
         collapsedBottomStack.isHidden = false
         collapsedBottomStack.alpha = 0
 
