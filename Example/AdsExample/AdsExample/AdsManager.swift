@@ -89,9 +89,9 @@ private func makeAdsConfiguration() -> AdsConfiguration {
       borderOpacity: 0.8,
       collapseButton: .init(
         symbolName: "chevron.down",
-        iconHex: "#0F172A",
+        iconHex: "#000000",
         backgroundHex: "#FFFFFFE6",
-        borderHex: "#D0D5DD",
+        borderHex: "#000000",
         borderOpacity: 0.95,
         touchTargetSize: 44,
         visualSize: 28,

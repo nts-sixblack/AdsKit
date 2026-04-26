@@ -1,5 +1,13 @@
 # Updating AdsKit
 
+## From 1.0.4 to 1.0.5
+
+- No API migration is required.
+- `load_failed` and failed fullscreen presentation events now include richer metadata from Google Mobile Ads errors and response info. Review any analytics allowlists if you forward `AdsEvent.metadata`.
+- `BannerAdsView` now emits banner load lifecycle events and avoids reloading the same banner signature on every SwiftUI update. Re-check dashboards that counted banner load requests from view refresh frequency.
+- Native preload calls now only record `preload_created` when a new request starts, and native request throttling considers the most recent request across all enabled placements for that slot.
+- Repeated `apply(configuration:)` and runtime flag updates with unchanged values no longer emit duplicate events.
+
 ## From 1.0.3 to 1.0.4
 
 - No API migration is required.

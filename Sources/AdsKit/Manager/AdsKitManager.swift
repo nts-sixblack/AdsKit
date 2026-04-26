@@ -46,6 +46,8 @@ public final class AdsKitManager: NSObject, ObservableObject {
 
     public func apply(configuration: AdsConfiguration) {
         let oldConfiguration = self.configuration
+        guard oldConfiguration != configuration else { return }
+
         self.configuration = configuration
         eventReporter.debugOptions = configuration.debug
 
@@ -74,7 +76,14 @@ public final class AdsKitManager: NSObject, ObservableObject {
     }
 
     public func updateRuntimeContext(_ runtimeContext: AdsRuntimeContext) {
+        let oldRuntimeContext = self.runtimeContext
         self.runtimeContext = runtimeContext
+        guard oldRuntimeContext.isAdsEnabled != runtimeContext.isAdsEnabled
+            || oldRuntimeContext.isPremiumUser != runtimeContext.isPremiumUser
+            || oldRuntimeContext.isFirstAppOpen != runtimeContext.isFirstAppOpen else {
+            return
+        }
+
         eventReporter.record(
             AdsEvent(
                 kind: .runtimeUpdated,
@@ -89,18 +98,21 @@ public final class AdsKitManager: NSObject, ObservableObject {
     }
 
     public func updateAdsEnabled(_ isEnabled: Bool) {
-        runtimeContext.isAdsEnabled = isEnabled
-        updateRuntimeContext(runtimeContext)
+        var context = runtimeContext
+        context.isAdsEnabled = isEnabled
+        updateRuntimeContext(context)
     }
 
     public func updatePremiumStatus(_ isPremiumUser: Bool) {
-        runtimeContext.isPremiumUser = isPremiumUser
-        updateRuntimeContext(runtimeContext)
+        var context = runtimeContext
+        context.isPremiumUser = isPremiumUser
+        updateRuntimeContext(context)
     }
 
     public func updateFirstAppOpen(_ isFirstAppOpen: Bool) {
-        runtimeContext.isFirstAppOpen = isFirstAppOpen
-        updateRuntimeContext(runtimeContext)
+        var context = runtimeContext
+        context.isFirstAppOpen = isFirstAppOpen
+        updateRuntimeContext(context)
     }
 
     public func suppressAppOpenAdOnce() {
@@ -296,6 +308,13 @@ public final class AdsKitManager: NSObject, ObservableObject {
         rewardedAdService.show(
             slot: slot,
             runtimeContext: runtimeContext,
+            onShown: { [weak self] in
+                guard let self else { return }
+                AdsDecisionEngine.recordOtherFullscreenShown(
+                    state: &self.decisionState,
+                    nowMs: self.currentTimestampMs()
+                )
+            },
             onDismissed: { [weak self] in
                 guard let self else { return }
                 self.isShowingFullscreenAd = false
@@ -306,10 +325,9 @@ public final class AdsKitManager: NSObject, ObservableObject {
                     onReward(reward)
                     return
                 }
-                AdsDecisionEngine.recordOtherFullscreenShown(
-                    state: &self.decisionState,
-                    nowMs: self.currentTimestampMs()
-                )
+                if reward == nil {
+                    self.isShowingFullscreenAd = false
+                }
                 onReward(reward)
             }
         )
@@ -360,13 +378,16 @@ public final class AdsKitManager: NSObject, ObservableObject {
             slot: slot,
             runtimeContext: runtimeContext,
             policy: configuration.policies.appOpen,
-            onDismissed: { [weak self] in
+            onShown: { [weak self] in
                 guard let self else { return }
-                self.isShowingFullscreenAd = false
                 AdsDecisionEngine.recordAppOpenShown(
                     state: &self.decisionState,
                     nowMs: self.currentTimestampMs()
                 )
+            },
+            onDismissed: { [weak self] in
+                guard let self else { return }
+                self.isShowingFullscreenAd = false
                 onDismissed?()
             }
         )
@@ -382,6 +403,8 @@ public final class AdsKitManager: NSObject, ObservableObject {
 
     public func preloadNative(slotKey: String) {
         guard let viewModel = nativeViewModel(for: slotKey) else { return }
+        guard viewModel.refreshAd() else { return }
+
         eventReporter.record(
             AdsEvent(
                 kind: .preloadCreated,
@@ -390,7 +413,6 @@ public final class AdsKitManager: NSObject, ObservableObject {
                 timestampMs: currentTimestampMs()
             )
         )
-        viewModel.refreshAd()
     }
 
     public func refreshNative(slotKey: String, force: Bool = false) {
@@ -441,6 +463,55 @@ public final class AdsKitManager: NSObject, ObservableObject {
                 precision: adValue.precision.rawValue,
                 currencyCode: adValue.currencyCode,
                 timestampMs: currentTimestampMs()
+            )
+        )
+    }
+
+    func recordBannerLoadRequested(
+        slotKey: String,
+        adUnitId: String
+    ) {
+        eventReporter.record(
+            AdsEvent(
+                kind: .loadRequested,
+                slotKey: slotKey,
+                adUnitId: adUnitId,
+                format: .banner,
+                timestampMs: currentTimestampMs()
+            )
+        )
+    }
+
+    func recordBannerLoadSucceeded(
+        slotKey: String,
+        adUnitId: String
+    ) {
+        eventReporter.record(
+            AdsEvent(
+                kind: .loadSucceeded,
+                slotKey: slotKey,
+                adUnitId: adUnitId,
+                format: .banner,
+                timestampMs: currentTimestampMs()
+            )
+        )
+    }
+
+    func recordBannerLoadFailed(
+        slotKey: String,
+        adUnitId: String,
+        error: Error,
+        responseInfo: ResponseInfo?
+    ) {
+        eventReporter.record(
+            AdsEvent(
+                kind: .loadFailed,
+                slotKey: slotKey,
+                adUnitId: adUnitId,
+                format: .banner,
+                message: error.localizedDescription,
+                timestampMs: currentTimestampMs(),
+                metadata: AdsErrorMetadata.make(from: error, responseInfo: responseInfo)
             )
         )
     }

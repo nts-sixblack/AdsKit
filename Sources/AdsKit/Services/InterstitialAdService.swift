@@ -197,7 +197,8 @@ final class InterstitialAdService: NSObject, FullScreenContentDelegate {
                         adUnitId: placement.id,
                         format: .interstitial,
                         message: error.localizedDescription,
-                        timestampMs: Int64(runtimeContext.nowProvider().timeIntervalSince1970 * 1000)
+                        timestampMs: Int64(runtimeContext.nowProvider().timeIntervalSince1970 * 1000),
+                        metadata: AdsErrorMetadata.make(from: error)
                     )
                 )
                 self.loadInterstitial(
@@ -302,7 +303,8 @@ final class InterstitialAdService: NSObject, FullScreenContentDelegate {
                         adUnitId: placement.id,
                         format: .splashInterstitial,
                         message: error.localizedDescription,
-                        timestampMs: Int64(runtimeContext.nowProvider().timeIntervalSince1970 * 1000)
+                        timestampMs: Int64(runtimeContext.nowProvider().timeIntervalSince1970 * 1000),
+                        metadata: AdsErrorMetadata.make(from: error)
                     )
                 )
                 self.loadSplash(
@@ -392,7 +394,8 @@ final class InterstitialAdService: NSObject, FullScreenContentDelegate {
                 adUnitId: currentAdUnitId(for: ad),
                 format: activeFormat,
                 message: error.localizedDescription,
-                timestampMs: Int64(Date().timeIntervalSince1970 * 1000)
+                timestampMs: Int64(Date().timeIntervalSince1970 * 1000),
+                metadata: AdsErrorMetadata.make(from: error)
             )
         )
         if activeFormat == .splashInterstitial {

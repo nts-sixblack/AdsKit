@@ -44,6 +44,13 @@ public struct BannerAdsView: View {
     }
 }
 
+fileprivate struct BannerLoadSignature: Equatable {
+    let adUnitID: String
+    let width: CGFloat
+    let height: CGFloat
+    let collapse: String?
+}
+
 private struct BannerAdsRepresentable: UIViewRepresentable {
     let slotKey: String
     let adUnitID: String
@@ -67,31 +74,64 @@ private struct BannerAdsRepresentable: UIViewRepresentable {
                 bannerView: bannerView
             )
         }
-        manager.bannerAdService.load(
-            bannerView: bannerView,
-            collapse: collapse,
-            rootViewController: manager.runtimeContext.topViewControllerProvider()
-        )
+        loadIfNeeded(bannerView, context: context, force: true)
         return bannerView
     }
 
     func updateUIView(_ bannerView: BannerView, context: Context) {
-        manager.bannerAdService.load(
-            bannerView: bannerView,
-            collapse: collapse,
-            rootViewController: manager.runtimeContext.topViewControllerProvider()
-        )
+        bannerView.adUnitID = adUnitID
+        bannerView.adSize = adSize
+        if bannerView.rootViewController == nil {
+            bannerView.rootViewController = manager.runtimeContext.topViewControllerProvider()
+        }
+        loadIfNeeded(bannerView, context: context)
     }
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
 
+    private func loadIfNeeded(
+        _ bannerView: BannerView,
+        context: Context,
+        force: Bool = false
+    ) {
+        let signature = BannerLoadSignature(
+            adUnitID: adUnitID,
+            width: adSize.size.width,
+            height: adSize.size.height,
+            collapse: collapse?.rawValue
+        )
+        guard force || context.coordinator.shouldLoad(signature: signature) else { return }
+
+        let didStartLoad = manager.bannerAdService.load(
+            bannerView: bannerView,
+            collapse: collapse,
+            rootViewController: manager.runtimeContext.topViewControllerProvider()
+        )
+        guard didStartLoad else { return }
+
+        context.coordinator.markLoadStarted(signature: signature)
+        manager.recordBannerLoadRequested(
+            slotKey: slotKey,
+            adUnitId: adUnitID
+        )
+    }
+
     final class Coordinator: NSObject, BannerViewDelegate {
         private let parent: BannerAdsRepresentable
+        private var lastLoadedSignature: BannerLoadSignature?
 
         init(_ parent: BannerAdsRepresentable) {
             self.parent = parent
+        }
+
+        func shouldLoad(signature: BannerLoadSignature) -> Bool {
+            lastLoadedSignature != signature
+        }
+
+        func markLoadStarted(signature: BannerLoadSignature) {
+            lastLoadedSignature = signature
         }
 
         func bannerViewDidRecordClick(_ bannerView: BannerView) {
@@ -104,10 +144,21 @@ private struct BannerAdsRepresentable: UIViewRepresentable {
 
         func bannerViewDidReceiveAd(_ bannerView: BannerView) {
             parent.isAdLoaded = true
+            guard let adUnitId = bannerView.adUnitID else { return }
+            parent.manager.recordBannerLoadSucceeded(
+                slotKey: parent.slotKey,
+                adUnitId: adUnitId
+            )
         }
 
         func bannerView(_ bannerView: BannerView, didFailToReceiveAdWithError error: Error) {
             parent.isAdLoaded = false
+            parent.manager.recordBannerLoadFailed(
+                slotKey: parent.slotKey,
+                adUnitId: bannerView.adUnitID ?? parent.adUnitID,
+                error: error,
+                responseInfo: bannerView.responseInfo
+            )
         }
     }
 }

@@ -117,6 +117,7 @@ public struct NativeAdsView: View {
                 EmptyView()
             }
         }
+//        .colorScheme(.light)
         .onAppear {
             bindObserver()
             manager.refreshNative(slotKey: slotKey)

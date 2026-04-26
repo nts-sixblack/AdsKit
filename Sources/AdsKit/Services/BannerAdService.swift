@@ -14,17 +14,18 @@ final class BannerAdService {
         return bannerView
     }
 
+    @discardableResult
     func load(
         bannerView: BannerView,
         collapse: AdsBannerCollapse?,
         rootViewController: UIViewController?
-    ) {
+    ) -> Bool {
         if bannerView.rootViewController == nil {
             bannerView.rootViewController = rootViewController
         }
 
         guard bannerView.rootViewController != nil else {
-            return
+            return false
         }
 
         let request = Request()
@@ -37,5 +38,6 @@ final class BannerAdService {
         }
 
         bannerView.load(request)
+        return true
     }
 }

@@ -2,6 +2,8 @@
 
 `AdsConfiguration` is the single source of truth for placements, policies, preload behavior, theme, and debug options.
 
+Applying the same configuration more than once is a no-op. Runtime updates also only emit `runtime_updated` when `isAdsEnabled`, `isPremiumUser`, or `isFirstAppOpen` actually changes.
+
 ## Slots
 
 Each `AdsSlot` represents one logical placement key used by the host app.
@@ -57,6 +59,8 @@ Fields:
 - `manual`: explicit preload keys used by `AdsKitManager.preloadManualSlots()`
 
 You can still preload one native slot directly with `AdsKitManager.preloadNative(slotKey:)`.
+
+Native preloads respect the native request interval across every enabled placement in the slot's load order. `preloadNative(slotKey:)` only records `preload_created` when a new native request actually starts.
 
 Example:
 
@@ -122,3 +126,23 @@ theme: .init(
 
 - `isVerboseLoggingEnabled`
 - `logSkippedShows`
+
+## Events
+
+`AdsEventSink` receives lifecycle events for banner, interstitial, splash interstitial, rewarded, app-open, and native ads. Banner SwiftUI updates only request a new ad when the banner load signature changes: ad unit ID, ad size, or collapse behavior.
+
+`load_failed` and failed fullscreen presentation events include structured metadata when available:
+
+- `error_domain`
+- `error_code`
+- `underlying_error_domain`
+- `underlying_error_code`
+- `underlying_error_message`
+- `response_identifier`
+- `adapter_response_count`
+- `loaded_adapter_name`
+- `loaded_ad_source_name`
+- `first_adapter_name`
+- `first_adapter_error_domain`
+- `first_adapter_error_code`
+- `first_adapter_error_message`

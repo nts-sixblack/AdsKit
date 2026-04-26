@@ -47,28 +47,29 @@ public final class NativeAdViewModel: NSObject, ObservableObject, NativeAdLoader
         }
     }
 
-    public func refreshAd(force: Bool = false) {
+    @discardableResult
+    public func refreshAd(force: Bool = false) -> Bool {
         let runtimeContext = runtimeProvider()
-        guard runtimeContext.isAdsEnabled else { return }
-        guard !runtimeContext.isPremiumUser else { return }
-        guard !isLoading else { return }
+        guard runtimeContext.isAdsEnabled else { return false }
+        guard !runtimeContext.isPremiumUser else { return false }
+        guard !isLoading else { return false }
 
         let placements = AdsPlacementResolver.loadOrder(for: slot)
-        guard !placements.isEmpty else { return }
+        guard !placements.isEmpty else { return false }
 
         if !force,
-           let currentPlacementId = loadedPlacementId,
-           let lastRequestTime = Self.lastRequestTimes[currentPlacementId] {
+           let lastRequestTime = mostRecentRequestTime(for: placements) {
             let elapsed = runtimeContext.nowProvider().timeIntervalSince(lastRequestTime)
             let requestInterval = TimeInterval(slot.requestIntervalSeconds ?? policy.defaultRequestIntervalSeconds)
-            if elapsed < requestInterval, nativeAd != nil {
-                return
+            if elapsed < requestInterval {
+                return false
             }
         }
 
         activePlacements = placements
         activePlacementIndex = 0
         loadPlacement(at: activePlacementIndex)
+        return true
     }
 
     public func clear() {
@@ -158,7 +159,8 @@ public final class NativeAdViewModel: NSObject, ObservableObject, NativeAdLoader
                 adUnitId: adLoader.adUnitID,
                 format: .native,
                 message: error.localizedDescription,
-                timestampMs: Int64(runtimeProvider().nowProvider().timeIntervalSince1970 * 1000)
+                timestampMs: Int64(runtimeProvider().nowProvider().timeIntervalSince1970 * 1000),
+                metadata: AdsErrorMetadata.make(from: error)
             )
         )
 
@@ -169,6 +171,10 @@ public final class NativeAdViewModel: NSObject, ObservableObject, NativeAdLoader
         }
 
         loadPlacement(at: nextIndex)
+    }
+
+    private func mostRecentRequestTime(for placements: [AdsPlacement]) -> Date? {
+        placements.compactMap { Self.lastRequestTimes[$0.id] }.max()
     }
 }
 

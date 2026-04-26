@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		A71B53A22F614C6D003C987B /* AdsKit in Frameworks */ = {isa = PBXBuildFile; productRef = A71B53A12F614C6D003C987B /* AdsKit */; };
+		AFBF7EF52F79019000B4E6F9 /* AdsKit in Frameworks */ = {isa = PBXBuildFile; productRef = AFBF7EF42F79019000B4E6F9 /* AdsKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +41,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AFBF7EF52F79019000B4E6F9 /* AdsKit in Frameworks */,
 				A71B53A22F614C6D003C987B /* AdsKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -84,6 +86,7 @@
 			name = AdsExample;
 			packageProductDependencies = (
 				A71B53A12F614C6D003C987B /* AdsKit */,
+				AFBF7EF42F79019000B4E6F9 /* AdsKit */,
 			);
 			productName = AdsExample;
 			productReference = A71B53922F614C33003C987B /* AdsExample.app */;
@@ -114,7 +117,7 @@
 			mainGroup = A71B53892F614C33003C987B;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				A71B53A02F614C6C003C987B /* XCLocalSwiftPackageReference "../../../AdsKit" */,
+				AFBF7EF32F79018F00B4E6F9 /* XCLocalSwiftPackageReference "../../../AdsKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A71B53932F614C33003C987B /* Products */;
@@ -360,7 +363,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		A71B53A02F614C6C003C987B /* XCLocalSwiftPackageReference "../../../AdsKit" */ = {
+		AFBF7EF32F79018F00B4E6F9 /* XCLocalSwiftPackageReference "../../../AdsKit" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../../../AdsKit;
 		};
@@ -368,6 +371,10 @@
 
 /* Begin XCSwiftPackageProductDependency section */
 		A71B53A12F614C6D003C987B /* AdsKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AdsKit;
+		};
+		AFBF7EF42F79019000B4E6F9 /* AdsKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = AdsKit;
 		};

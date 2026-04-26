@@ -67,4 +67,6 @@ func openLanguageScreen() {
 }
 ```
 
+Repeated `apply(configuration:)` calls with an unchanged configuration are ignored. Runtime flag updates are also ignored when the value is already current, which keeps analytics sinks from receiving duplicate `configuration_applied` or `runtime_updated` events during remote config refreshes.
+
 The same approach works with Firebase Remote Config, LaunchDarkly, local JSON, or your own API.

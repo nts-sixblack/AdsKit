@@ -39,6 +39,27 @@ final class AdsKitManagerTests: XCTestCase {
         )
     }
 
+    func testManagerDoesNotEmitEventsForIdenticalConfigurationOrRuntimeFlags() {
+        let sink = RecordingSink()
+        let configuration = makeNativeConfiguration()
+        let manager = AdsKitManager(
+            configuration: configuration,
+            runtimeContext: makeRuntimeContext(now: 15),
+            eventSink: sink
+        )
+
+        manager.apply(configuration: configuration)
+        manager.updateRuntimeContext(makeRuntimeContext(now: 16))
+
+        XCTAssertTrue(sink.events.isEmpty)
+
+        manager.updateAdsEnabled(false)
+        manager.updateAdsEnabled(false)
+
+        XCTAssertEqual(sink.events.map(\.kind), [.runtimeUpdated])
+        XCTAssertEqual(sink.events.first?.metadata["ads_enabled"], "false")
+    }
+
     func testNativeViewModelRegistryReusesInstanceWhenConfigurationDoesNotChange() {
         let configuration = makeNativeConfiguration()
         let manager = AdsKitManager(

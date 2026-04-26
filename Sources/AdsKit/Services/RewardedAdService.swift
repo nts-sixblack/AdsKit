@@ -7,7 +7,10 @@ final class RewardedAdService: NSObject, FullScreenContentDelegate {
     private let reporter: AdsEventReporter
 
     private(set) var rewardedAd: RewardedAd?
+    private var isLoading = false
+    private var pendingLoadCallbacks: [() -> Void] = []
     private var activeSlotKey: String?
+    private var onShown: (() -> Void)?
     private var onDismissed: (() -> Void)?
 
     init(reporter: AdsEventReporter) {
@@ -23,34 +26,45 @@ final class RewardedAdService: NSObject, FullScreenContentDelegate {
             onLoaded?()
             return
         }
+        guard !isLoading else {
+            if let onLoaded {
+                pendingLoadCallbacks.append(onLoaded)
+            }
+            return
+        }
         let placements = AdsPlacementResolver.loadOrder(for: slot)
         guard !placements.isEmpty else {
             onLoaded?()
             return
         }
+        isLoading = true
+        if let onLoaded {
+            pendingLoadCallbacks.append(onLoaded)
+        }
         loadRewarded(
             slot: slot,
             placements: placements,
             index: 0,
-            runtimeContext: runtimeContext,
-            onLoaded: onLoaded
+            runtimeContext: runtimeContext
         )
     }
 
     func show(
         slot: AdsSlot,
         runtimeContext: AdsRuntimeContext,
+        onShown: (() -> Void)?,
         onDismissed: (() -> Void)?,
         onReward: @escaping (AdReward?) -> Void
     ) {
-        self.onDismissed = onDismissed
-
         guard let rootViewController = runtimeContext.topViewControllerProvider() else {
             onReward(nil)
+            onDismissed?()
             return
         }
 
         if let rewardedAd {
+            self.onShown = onShown
+            self.onDismissed = onDismissed
             activeSlotKey = slot.key
             rewardedAd.present(from: rootViewController) { [weak self] in
                 guard let self else { return }
@@ -75,9 +89,19 @@ final class RewardedAdService: NSObject, FullScreenContentDelegate {
         let placements = AdsPlacementResolver.loadOrder(for: slot)
         guard !placements.isEmpty else {
             onReward(nil)
+            onDismissed?()
+            return
+        }
+        guard !isLoading else {
+            onReward(nil)
+            onDismissed?()
             return
         }
 
+        self.onShown = onShown
+        self.onDismissed = onDismissed
+        activeSlotKey = slot.key
+        isLoading = true
         loadAndPresentRewarded(
             slot: slot,
             placements: placements,
@@ -92,10 +116,12 @@ final class RewardedAdService: NSObject, FullScreenContentDelegate {
         slot: AdsSlot,
         placements: [AdsPlacement],
         index: Int,
-        runtimeContext: AdsRuntimeContext,
-        onLoaded: (() -> Void)?
+        runtimeContext: AdsRuntimeContext
     ) {
-        guard placements.indices.contains(index) else { return }
+        guard placements.indices.contains(index) else {
+            finishLoadingRewarded(didLoad: false)
+            return
+        }
         let placement = placements[index]
         reporter.record(
             AdsEvent(
@@ -116,16 +142,20 @@ final class RewardedAdService: NSObject, FullScreenContentDelegate {
                         adUnitId: placement.id,
                         format: .rewarded,
                         message: error.localizedDescription,
-                        timestampMs: Int64(runtimeContext.nowProvider().timeIntervalSince1970 * 1000)
+                        timestampMs: Int64(runtimeContext.nowProvider().timeIntervalSince1970 * 1000),
+                        metadata: AdsErrorMetadata.make(from: error)
                     )
                 )
                 self.loadRewarded(
                     slot: slot,
                     placements: placements,
                     index: index + 1,
-                    runtimeContext: runtimeContext,
-                    onLoaded: onLoaded
+                    runtimeContext: runtimeContext
                 )
+                return
+            }
+            guard let ad else {
+                self.finishLoadingRewarded(didLoad: false)
                 return
             }
             self.rewardedAd = ad
@@ -154,7 +184,7 @@ final class RewardedAdService: NSObject, FullScreenContentDelegate {
                     timestampMs: Int64(runtimeContext.nowProvider().timeIntervalSince1970 * 1000)
                 )
             )
-            onLoaded?()
+            self.finishLoadingRewarded(didLoad: true)
         }
     }
 
@@ -167,7 +197,10 @@ final class RewardedAdService: NSObject, FullScreenContentDelegate {
         onReward: @escaping (AdReward?) -> Void
     ) {
         guard placements.indices.contains(index) else {
+            isLoading = false
             onReward(nil)
+            onDismissed?()
+            clearPresentationCallbacks()
             return
         }
 
@@ -192,7 +225,8 @@ final class RewardedAdService: NSObject, FullScreenContentDelegate {
                         adUnitId: placement.id,
                         format: .rewarded,
                         message: error.localizedDescription,
-                        timestampMs: Int64(runtimeContext.nowProvider().timeIntervalSince1970 * 1000)
+                        timestampMs: Int64(runtimeContext.nowProvider().timeIntervalSince1970 * 1000),
+                        metadata: AdsErrorMetadata.make(from: error)
                     )
                 )
                 self.loadAndPresentRewarded(
@@ -207,11 +241,14 @@ final class RewardedAdService: NSObject, FullScreenContentDelegate {
             }
 
             guard let ad else {
+                self.isLoading = false
                 onReward(nil)
+                self.onDismissed?()
+                self.clearPresentationCallbacks()
                 return
             }
 
-            self.activeSlotKey = slot.key
+            self.isLoading = false
             self.rewardedAd = ad
             self.rewardedAd?.fullScreenContentDelegate = self
             self.rewardedAd?.paidEventHandler = { [weak self] adValue in
@@ -259,6 +296,8 @@ final class RewardedAdService: NSObject, FullScreenContentDelegate {
     }
 
     func adWillPresentFullScreenContent(_ ad: FullScreenPresentingAd) {
+        onShown?()
+        onShown = nil
         reporter.record(
             AdsEvent(
                 kind: .willPresent,
@@ -283,7 +322,7 @@ final class RewardedAdService: NSObject, FullScreenContentDelegate {
         rewardedAd = nil
         activeSlotKey = nil
         onDismissed?()
-        onDismissed = nil
+        clearPresentationCallbacks()
     }
 
     func ad(
@@ -297,13 +336,14 @@ final class RewardedAdService: NSObject, FullScreenContentDelegate {
                 adUnitId: (ad as? RewardedAd)?.adUnitID,
                 format: .rewarded,
                 message: error.localizedDescription,
-                timestampMs: Int64(Date().timeIntervalSince1970 * 1000)
+                timestampMs: Int64(Date().timeIntervalSince1970 * 1000),
+                metadata: AdsErrorMetadata.make(from: error)
             )
         )
         rewardedAd = nil
         activeSlotKey = nil
         onDismissed?()
-        onDismissed = nil
+        clearPresentationCallbacks()
     }
 
     func adDidRecordClick(_ ad: FullScreenPresentingAd) {
@@ -316,5 +356,20 @@ final class RewardedAdService: NSObject, FullScreenContentDelegate {
                 timestampMs: Int64(Date().timeIntervalSince1970 * 1000)
             )
         )
+    }
+
+    private func finishLoadingRewarded(didLoad: Bool) {
+        isLoading = false
+        let callbacks = pendingLoadCallbacks
+        pendingLoadCallbacks.removeAll()
+
+        guard didLoad else { return }
+        callbacks.forEach { $0() }
+    }
+
+    private func clearPresentationCallbacks() {
+        activeSlotKey = nil
+        onDismissed = nil
+        onShown = nil
     }
 }

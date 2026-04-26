@@ -14,7 +14,10 @@ Reusable iOS 16+ Swift Package for AdMob-based ads, designed for reuse across mu
 - Native preload/cache support
 - Fallback placements
 - Runtime-updatable config
+- Idempotent config/runtime updates
 - Pluggable event sink API
+- Banner and fullscreen load lifecycle reporting
+- Google Mobile Ads error metadata on failed loads and presentations
 - SwiftInjected integration
 
 ## Installation
@@ -156,6 +159,12 @@ final class AnalyticsSink: AdsEventSink {
     }
 }
 ```
+
+`BannerAdsView` reports `load_requested`, `load_succeeded`, `load_failed`, and `click` events. SwiftUI refreshes only trigger a new banner load when the ad unit, ad size, or collapse setting changes, so view updates no longer inflate banner request counts.
+
+Failed load and presentation events include structured metadata when Google Mobile Ads exposes it. Common keys include `error_domain`, `error_code`, `underlying_error_domain`, `response_identifier`, `adapter_response_count`, `loaded_adapter_name`, and first-adapter error details.
+
+Calling `apply(configuration:)` with the same configuration, or updating runtime flags to their current values, is a no-op and does not emit duplicate analytics events.
 
 ## SwiftInjected
 

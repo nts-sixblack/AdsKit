@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.5
+
+- Added richer `load_failed` metadata for Google Mobile Ads errors, including NSError domain/code, underlying errors, response identifiers, and adapter response details when available.
+- Added banner `load_requested`, `load_succeeded`, and `load_failed` event reporting from `BannerAdsView`.
+- Prevented repeated SwiftUI banner updates from reloading the same ad unit, size, and collapse configuration.
+- Reduced duplicate app-open, rewarded, and native loads by tracking in-flight requests and making native request throttling consider all candidate placements.
+- Updated app-open and rewarded presentation callbacks so fullscreen cooldown state is recorded when the ad actually presents and dismissal callbacks are cleared consistently.
+- Made identical configuration and runtime flag updates no-op so analytics sinks do not receive duplicate `configuration_applied` or `runtime_updated` events.
+
 ## 1.0.4
 
 - Fixed collapse native ads so the compact collapsed row shows the ad icon before the headline instead of reserving a media thumbnail slot.
