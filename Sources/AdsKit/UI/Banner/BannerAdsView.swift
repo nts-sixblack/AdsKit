@@ -25,28 +25,30 @@ public struct BannerAdsView: View {
 
     public var body: some View {
         let measuredWidth = max(0, availableWidth.rounded(.down))
-        let effectiveAdSize = measuredWidth > 0 ? resolvedAdSize(for: measuredWidth) : nil
-        let bannerHeight = effectiveAdSize.map { max(0, $0.size.height) } ?? 0
+        let layout = measuredWidth > 0 ? resolvedLayout(for: measuredWidth) : nil
+        let bannerWidth = layout?.frameSize.width ?? 0
+        let bannerHeight = layout?.frameSize.height ?? 0
         let canRenderBanner = manager.canDisplay(slotKey: slotKey)
             && isAdLoaded
             && measuredWidth > 0
+            && bannerWidth > 0
             && bannerHeight > 0
 
         ZStack {
             if canRenderBanner,
-               let effectiveAdSize,
+               let layout,
                let slot = manager.slot(forKey: slotKey),
                let placement = AdsPlacementResolver.preferredPlacement(for: slot) {
                 BannerAdsRepresentable(
                     slotKey: slot.key,
                     adUnitID: placement.id,
-                    adSize: effectiveAdSize,
+                    adSize: layout.adSize,
                     manager: manager,
                     collapse: collapse,
                     isAdLoaded: $isAdLoaded
                 )
                 .frame(
-                    width: min(effectiveAdSize.size.width, measuredWidth),
+                    width: layout.frameSize.width,
                     height: bannerHeight
                 )
                 .clipped()
@@ -62,12 +64,44 @@ public struct BannerAdsView: View {
         }
     }
 
-    private func resolvedAdSize(for availableWidth: CGFloat) -> AdSize {
+    private func resolvedLayout(for availableWidth: CGFloat) -> BannerAdLayout {
         guard let requestedAdSize else {
-            return currentOrientationAnchoredAdaptiveBanner(width: max(1, availableWidth))
+            return BannerAdLayout.defaultLayout(for: availableWidth)
         }
 
-        return requestedAdSize
+        return BannerAdLayout(adSize: requestedAdSize, availableWidth: availableWidth)
+    }
+}
+
+struct BannerAdLayout {
+    let adSize: AdSize
+    let frameSize: CGSize
+
+    init(adSize: AdSize, availableWidth: CGFloat) {
+        self.adSize = adSize
+        self.frameSize = CGSize(
+            width: min(max(0, adSize.size.width), max(0, availableWidth)),
+            height: max(0, adSize.size.height)
+        )
+    }
+
+    static func defaultLayout(for availableWidth: CGFloat) -> BannerAdLayout {
+        let width = min(
+            max(1, availableWidth.rounded(.down)),
+            defaultMaximumSize.width
+        )
+        let adSize = inlineAdaptiveBanner(
+            width: width,
+            maxHeight: defaultMaximumSize.height
+        )
+        return BannerAdLayout(adSize: adSize, availableWidth: width)
+    }
+
+    private static var defaultMaximumSize: CGSize {
+        CGSize(
+            width: max(1, AdSizeBanner.size.width),
+            height: max(50, AdSizeBanner.size.height)
+        )
     }
 }
 

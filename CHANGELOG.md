@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.7
+
+- Capped the default `BannerAdsView` adaptive size to the standard banner envelope when no explicit `adSize` is provided, preventing wide containers from creating oversized banners that clip content or break surrounding layout.
+- Kept explicit `adSize` behavior unchanged for screens that intentionally need larger fixed or custom Google Mobile Ads banner sizes.
+
 ## 1.0.6
 
 - Updated `BannerAdsView` to resolve adaptive banner size from the SwiftUI container width instead of the full screen width when no explicit `adSize` is provided.

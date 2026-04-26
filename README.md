@@ -118,7 +118,7 @@ struct HomeView: View {
 }
 ```
 
-When `adSize` is omitted, `BannerAdsView` measures the SwiftUI container width and creates the current-orientation anchored adaptive banner for that width. Pass an explicit Google Mobile Ads `AdSize` only when the host screen needs a fixed banner size.
+When `adSize` is omitted, `BannerAdsView` measures the SwiftUI container width and creates an adaptive banner capped to the standard banner envelope, so wider containers do not inflate the ad and break nearby layout. Pass an explicit Google Mobile Ads `AdSize` when the host screen needs a fixed, larger, or fully custom banner size.
 
 The banner view does not reserve vertical space while its width is unknown, when the slot cannot display, or after a load failure.
 

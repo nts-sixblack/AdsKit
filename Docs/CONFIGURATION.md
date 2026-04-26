@@ -28,9 +28,9 @@ Fields:
 
 ## Banner Layout
 
-`BannerAdsView(slotKey:manager:)` defaults to an anchored adaptive banner based on the measured SwiftUI container width. This keeps banners correctly sized inside constrained layouts, split views, and device rotations without using the full screen width as a proxy.
+`BannerAdsView(slotKey:manager:)` defaults to an adaptive banner based on the measured SwiftUI container width, capped to the standard banner envelope. This keeps banners correctly sized inside constrained layouts, split views, and device rotations without letting wide containers inflate the ad and crowd the banner content.
 
-Pass `adSize:` when the host app needs a fixed Google Mobile Ads banner size. The view collapses to height `0` until it has a valid width and after a failed banner load, so parent layouts do not keep an empty banner gap.
+Pass `adSize:` when the host app needs a fixed, larger, or custom Google Mobile Ads banner size. The view collapses to height `0` until it has a valid width and after a failed banner load, so parent layouts do not keep an empty banner gap.
 
 ## Policies
 

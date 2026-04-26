@@ -1,5 +1,11 @@
 # Updating AdsKit
 
+## From 1.0.6 to 1.0.7
+
+- No API migration is required.
+- `BannerAdsView` now caps its default adaptive banner size to the standard banner envelope when `adSize` is omitted, preventing oversized banners in wide or unconstrained containers.
+- Continue passing an explicit `adSize` for larger fixed banners or custom Google Mobile Ads sizes.
+
 ## From 1.0.5 to 1.0.6
 
 - No API migration is required.
