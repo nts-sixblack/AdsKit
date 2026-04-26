@@ -26,6 +26,12 @@ Fields:
 - `adChoicesPosition`: optional native-only override.
 - `requestIntervalSeconds`: optional native-only throttle override.
 
+## Banner Layout
+
+`BannerAdsView(slotKey:manager:)` defaults to an anchored adaptive banner based on the measured SwiftUI container width. This keeps banners correctly sized inside constrained layouts, split views, and device rotations without using the full screen width as a proxy.
+
+Pass `adSize:` when the host app needs a fixed Google Mobile Ads banner size. The view collapses to height `0` until it has a valid width and after a failed banner load, so parent layouts do not keep an empty banner gap.
+
 ## Policies
 
 `AdsPolicies` groups runtime behavior:

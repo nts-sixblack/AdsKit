@@ -5,10 +5,11 @@ import UIKit
 public struct BannerAdsView: View {
     @ObservedObject private var manager: AdsKitManager
     private let slotKey: String
-    private let adSize: AdSize
+    private let requestedAdSize: AdSize?
     private let collapse: AdsBannerCollapse?
 
     @State private var isAdLoaded = true
+    @State private var availableWidth: CGFloat = 0
 
     public init(
         slotKey: String,
@@ -19,27 +20,75 @@ public struct BannerAdsView: View {
         self.slotKey = slotKey
         self.manager = manager
         self.collapse = collapse
-        self.adSize = adSize ?? currentOrientationAnchoredAdaptiveBanner(width: UIScreen.main.bounds.width)
+        self.requestedAdSize = adSize
     }
 
     public var body: some View {
-        VStack {
-            if !manager.canDisplay(slotKey: slotKey) || !isAdLoaded {
-                EmptyView()
-            } else if let slot = manager.slot(forKey: slotKey),
-                      let placement = AdsPlacementResolver.preferredPlacement(for: slot) {
+        let measuredWidth = max(0, availableWidth.rounded(.down))
+        let effectiveAdSize = measuredWidth > 0 ? resolvedAdSize(for: measuredWidth) : nil
+        let bannerHeight = effectiveAdSize.map { max(0, $0.size.height) } ?? 0
+        let canRenderBanner = manager.canDisplay(slotKey: slotKey)
+            && isAdLoaded
+            && measuredWidth > 0
+            && bannerHeight > 0
+
+        ZStack {
+            if canRenderBanner,
+               let effectiveAdSize,
+               let slot = manager.slot(forKey: slotKey),
+               let placement = AdsPlacementResolver.preferredPlacement(for: slot) {
                 BannerAdsRepresentable(
                     slotKey: slot.key,
                     adUnitID: placement.id,
-                    adSize: adSize,
+                    adSize: effectiveAdSize,
                     manager: manager,
                     collapse: collapse,
                     isAdLoaded: $isAdLoaded
                 )
-                .frame(height: max(60, adSize.size.height))
-            } else {
-                EmptyView()
+                .frame(
+                    width: min(effectiveAdSize.size.width, measuredWidth),
+                    height: bannerHeight
+                )
+                .clipped()
             }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: canRenderBanner ? bannerHeight : 0)
+        .background(BannerAvailableWidthReader())
+        .onPreferenceChange(BannerAvailableWidthKey.self) { width in
+            let normalizedWidth = max(0, width.rounded(.down))
+            guard abs(availableWidth - normalizedWidth) >= 1 else { return }
+            availableWidth = normalizedWidth
+        }
+    }
+
+    private func resolvedAdSize(for availableWidth: CGFloat) -> AdSize {
+        guard let requestedAdSize else {
+            return currentOrientationAnchoredAdaptiveBanner(width: max(1, availableWidth))
+        }
+
+        return requestedAdSize
+    }
+}
+
+private struct BannerAvailableWidthKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        let nextValue = nextValue()
+        if nextValue > 0 {
+            value = nextValue
+        }
+    }
+}
+
+private struct BannerAvailableWidthReader: View {
+    var body: some View {
+        GeometryReader { proxy in
+            Color.clear.preference(
+                key: BannerAvailableWidthKey.self,
+                value: proxy.size.width
+            )
         }
     }
 }

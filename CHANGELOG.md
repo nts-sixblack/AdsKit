@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.6
+
+- Updated `BannerAdsView` to resolve adaptive banner size from the SwiftUI container width instead of the full screen width when no explicit `adSize` is provided.
+- Collapsed banner layout height to `0` while width is still being measured, ads are suppressed, or the banner load has failed, preventing blank reserved space.
+- Preserved explicit `adSize` behavior for hosts that need a fixed Google Mobile Ads banner size.
+
 ## 1.0.5
 
 - Added richer `load_failed` metadata for Google Mobile Ads errors, including NSError domain/code, underlying errors, response identifiers, and adapter response details when available.

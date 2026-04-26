@@ -1,5 +1,12 @@
 # Updating AdsKit
 
+## From 1.0.5 to 1.0.6
+
+- No API migration is required.
+- `BannerAdsView` now derives the default adaptive banner size from the measured SwiftUI container width instead of `UIScreen.main.bounds.width`.
+- If a screen depends on a fixed banner size, continue passing an explicit `adSize`.
+- Re-check any layout that expected an empty reserved banner height when ads are unavailable or a banner load fails; the view now collapses to height `0` in those states.
+
 ## From 1.0.4 to 1.0.5
 
 - No API migration is required.

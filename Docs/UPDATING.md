@@ -15,3 +15,4 @@
 - Check whether new `AdsEvent.Kind` cases need analytics mapping.
 - Check whether new `AdsEvent.metadata` keys should be forwarded to analytics or diagnostics.
 - Check whether new policy fields or slot requirements need remote config changes.
+- Re-check banner containers after updates that affect `BannerAdsView` sizing, especially screens that constrain banner width or expect a fixed reserved height.
