@@ -1,5 +1,12 @@
 # Updating AdsKit
 
+## From 1.0.7 to 1.0.8
+
+- No API migration is required for existing load/show calls.
+- Fullscreen cache readiness is now available through `hasLoadedInterstitial`, `hasLoadedRewarded`, and `hasLoadedAppOpen`.
+- Native readiness is available through `hasLoadedNative`. Non-forced native refreshes now reuse the slot's existing ad instead of requesting another one; call `refreshNative(slotKey:force: true)` when replacing the native ad is intentional.
+- If multiple logical slots previously pointed at the same native ad unit and relied on cross-slot native cache reuse, re-check that flow. Native cache entries are now scoped by `slotKey` to avoid attribution and display collisions.
+
 ## From 1.0.6 to 1.0.7
 
 - No API migration is required.

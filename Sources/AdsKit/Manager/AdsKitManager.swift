@@ -132,6 +132,34 @@ public final class AdsKitManager: NSObject, ObservableObject {
         return canDisplay(slot: slot)
     }
 
+    public func hasLoadedInterstitial(slotKey: String) -> Bool {
+        guard let slot = resolveSlot(
+            forKey: slotKey,
+            expectedFormats: [.interstitial, .splashInterstitial]
+        ) else {
+            return false
+        }
+        return interstitialAdService.hasCachedAd(for: slot)
+    }
+
+    public func hasLoadedRewarded(slotKey: String) -> Bool {
+        guard let slot = resolveSlot(forKey: slotKey, expectedFormats: [.rewarded]) else {
+            return false
+        }
+        return rewardedAdService.hasCachedAd(for: slot)
+    }
+
+    public func hasLoadedAppOpen(slotKey: String) -> Bool {
+        guard let slot = resolveSlot(forKey: slotKey, expectedFormats: [.appOpen]) else {
+            return false
+        }
+        return appOpenAdService.hasCachedAd(for: slot)
+    }
+
+    public func hasLoadedNative(slotKey: String) -> Bool {
+        nativeViewModels[slotKey]?.hasLoadedAd ?? false
+    }
+
     public func loadInterstitial(
         slotKey: String,
         onLoaded: (() -> Void)? = nil

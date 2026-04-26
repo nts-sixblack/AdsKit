@@ -12,6 +12,7 @@ Reusable iOS 16+ Swift Package for AdMob-based ads, designed for reuse across mu
 - Native ads with multiple built-in styles
 - Collapse native ads with an expanded media state and compact ad-icon row
 - Native preload/cache support
+- Slot-scoped fullscreen and native cache readiness checks
 - Fallback placements
 - Runtime-updatable config
 - Idempotent config/runtime updates
@@ -95,6 +96,15 @@ adsManager.preloadManualSlots()
 adsManager.preloadNative(slotKey: "language_native")
 ```
 
+Preloaded fullscreen and native ads are cached per slot key and validated against the current slot placements before reuse. You can check readiness without starting a new load:
+
+```swift
+adsManager.hasLoadedInterstitial(slotKey: "splash_inter")
+adsManager.hasLoadedRewarded(slotKey: "coins_rewarded")
+adsManager.hasLoadedAppOpen(slotKey: "launch_app_open")
+adsManager.hasLoadedNative(slotKey: "language_native")
+```
+
 ## SwiftUI usage
 
 ```swift
@@ -169,6 +179,8 @@ final class AnalyticsSink: AdsEventSink {
 Failed load and presentation events include structured metadata when Google Mobile Ads exposes it. Common keys include `error_domain`, `error_code`, `underlying_error_domain`, `response_identifier`, `adapter_response_count`, `loaded_adapter_name`, and first-adapter error details.
 
 Calling `apply(configuration:)` with the same configuration, or updating runtime flags to their current values, is a no-op and does not emit duplicate analytics events.
+
+Fullscreen services keep separate cached ads and in-flight loads per `slotKey`, so an ad loaded for one logical slot is not presented or attributed as another slot. Splash interstitial presentation also consumes a matching preloaded splash cache before starting an on-demand request.
 
 ## SwiftInjected
 

@@ -9,6 +9,7 @@ public final class NativeAdViewModel: NSObject, ObservableObject, NativeAdLoader
     @Published public private(set) var isLoading: Bool = false
 
     public var slotKey: String { slot.key }
+    public var hasLoadedAd: Bool { nativeAd != nil }
 
     private let slot: AdsSlot
     private let policy: AdsNativePolicy
@@ -36,14 +37,7 @@ public final class NativeAdViewModel: NSObject, ObservableObject, NativeAdLoader
         super.init()
 
         if policy.usesSharedCache {
-            if let cachedAd = Self.cachedAds[slot.primaryPlacement.id] {
-                nativeAd = cachedAd
-                loadedPlacementId = slot.primaryPlacement.id
-            } else if let fallbackPlacement = slot.fallbackPlacement,
-                      let cachedAd = Self.cachedAds[fallbackPlacement.id] {
-                nativeAd = cachedAd
-                loadedPlacementId = fallbackPlacement.id
-            }
+            useCachedAdIfAvailable(for: AdsPlacementResolver.loadOrder(for: slot))
         }
     }
 
@@ -56,6 +50,14 @@ public final class NativeAdViewModel: NSObject, ObservableObject, NativeAdLoader
 
         let placements = AdsPlacementResolver.loadOrder(for: slot)
         guard !placements.isEmpty else { return false }
+
+        if !force, hasLoadedAd(for: placements) {
+            return false
+        }
+
+        if !force, policy.usesSharedCache, useCachedAdIfAvailable(for: placements) {
+            return false
+        }
 
         if !force,
            let lastRequestTime = mostRecentRequestTime(for: placements) {
@@ -73,6 +75,9 @@ public final class NativeAdViewModel: NSObject, ObservableObject, NativeAdLoader
     }
 
     public func clear() {
+        if let loadedPlacementId {
+            Self.cachedAds[cacheKey(for: loadedPlacementId)] = nil
+        }
         nativeAd = nil
         loadedPlacementId = nil
     }
@@ -102,7 +107,7 @@ public final class NativeAdViewModel: NSObject, ObservableObject, NativeAdLoader
         let viewOptions = NativeAdViewAdOptions()
         viewOptions.preferredAdChoicesPosition = (slot.adChoicesPosition ?? policy.defaultAdChoicesPosition).googleValue
 
-        Self.lastRequestTimes[placement.id] = runtimeContext.nowProvider()
+        Self.lastRequestTimes[cacheKey(for: placement.id)] = runtimeContext.nowProvider()
         adLoader = AdLoader(
             adUnitID: placement.id,
             rootViewController: runtimeContext.topViewControllerProvider(),
@@ -136,7 +141,7 @@ public final class NativeAdViewModel: NSObject, ObservableObject, NativeAdLoader
         self.nativeAd = nativeAd
         self.loadedPlacementId = adLoader.adUnitID
         if policy.usesSharedCache {
-            Self.cachedAds[adLoader.adUnitID] = nativeAd
+            Self.cachedAds[cacheKey(for: adLoader.adUnitID)] = nativeAd
         }
         isLoading = false
 
@@ -174,7 +179,28 @@ public final class NativeAdViewModel: NSObject, ObservableObject, NativeAdLoader
     }
 
     private func mostRecentRequestTime(for placements: [AdsPlacement]) -> Date? {
-        placements.compactMap { Self.lastRequestTimes[$0.id] }.max()
+        placements.compactMap { Self.lastRequestTimes[cacheKey(for: $0.id)] }.max()
+    }
+
+    private func hasLoadedAd(for placements: [AdsPlacement]) -> Bool {
+        guard nativeAd != nil, let loadedPlacementId else { return false }
+        return placements.contains(where: { $0.id == loadedPlacementId })
+    }
+
+    @discardableResult
+    private func useCachedAdIfAvailable(for placements: [AdsPlacement]) -> Bool {
+        for placement in placements {
+            if let cachedAd = Self.cachedAds[cacheKey(for: placement.id)] {
+                nativeAd = cachedAd
+                loadedPlacementId = placement.id
+                return true
+            }
+        }
+        return false
+    }
+
+    private func cacheKey(for placementId: String) -> String {
+        "\(slot.key)|\(placementId)"
     }
 }
 

@@ -5,16 +5,30 @@ import UIKit
 
 @MainActor
 final class InterstitialAdService: NSObject, FullScreenContentDelegate {
+    @MainActor
     private final class SplashLoadState {
         var didFinish = false
     }
 
+    private struct CachedInterstitialAd {
+        let ad: InterstitialAd
+        let adUnitID: String
+    }
+
     private let reporter: AdsEventReporter
 
-    private(set) var interstitialAd: InterstitialAd?
-    private(set) var splashInterstitialAd: InterstitialAd?
+    var interstitialAd: InterstitialAd? {
+        interstitialAdsBySlot.values.first?.ad
+    }
 
-    private var isLoading = false
+    var splashInterstitialAd: InterstitialAd? {
+        splashInterstitialAdsBySlot.values.first?.ad
+    }
+
+    private var interstitialAdsBySlot: [String: CachedInterstitialAd] = [:]
+    private var splashInterstitialAdsBySlot: [String: CachedInterstitialAd] = [:]
+    private var loadingKeys: Set<String> = []
+    private var pendingLoadCallbacksByKey: [String: [() -> Void]] = [:]
     private var retryAttemptsBySlot: [String: Int] = [:]
     private var activeSlotKey: String?
     private var activeFormat: AdsFormat?
@@ -27,15 +41,23 @@ final class InterstitialAdService: NSObject, FullScreenContentDelegate {
         self.reporter = reporter
     }
 
+    func hasCachedAd(for slot: AdsSlot) -> Bool {
+        cachedAd(for: slot, format: cacheFormat(for: slot)) != nil
+    }
+
     func load(
         slot: AdsSlot,
         retryPolicy: AdsRetryPolicy,
         runtimeContext: AdsRuntimeContext,
         onLoaded: (() -> Void)? = nil
     ) {
-        guard !isLoading else { return }
-        guard interstitialAd == nil else {
+        let format = cacheFormat(for: slot)
+        guard cachedAd(for: slot, format: format) == nil else {
             onLoaded?()
+            return
+        }
+        guard !isLoading(slot: slot, format: format) else {
+            appendPendingLoadCallback(onLoaded, slot: slot, format: format)
             return
         }
 
@@ -45,13 +67,15 @@ final class InterstitialAdService: NSObject, FullScreenContentDelegate {
             return
         }
 
+        startLoading(slot: slot, format: format)
+        appendPendingLoadCallback(onLoaded, slot: slot, format: format)
         loadInterstitial(
             slot: slot,
             placements: placements,
             index: 0,
+            format: format,
             retryPolicy: retryPolicy,
-            runtimeContext: runtimeContext,
-            onLoaded: onLoaded
+            runtimeContext: runtimeContext
         )
     }
 
@@ -69,13 +93,14 @@ final class InterstitialAdService: NSObject, FullScreenContentDelegate {
             return
         }
 
-        guard let interstitialAd else {
+        let format = cacheFormat(for: slot)
+        guard let cachedAd = cachedAd(for: slot, format: format) else {
             reporter.record(
                 AdsEvent(
                     kind: .skipped,
                     slotKey: slot.key,
                     adUnitId: nil,
-                    format: .interstitial,
+                    format: format,
                     message: "Interstitial not ready",
                     timestampMs: Int64(runtimeContext.nowProvider().timeIntervalSince1970 * 1000)
                 )
@@ -90,13 +115,13 @@ final class InterstitialAdService: NSObject, FullScreenContentDelegate {
         }
 
         activeSlotKey = slot.key
-        activeFormat = .interstitial
+        activeFormat = format
         self.onShown = onShown
         self.onDismissed = onDismissed
         self.onFailed = onFailed
         self.autoReload = autoReload
 
-        interstitialAd.present(from: rootViewController)
+        cachedAd.ad.present(from: rootViewController)
     }
 
     func showSplash(
@@ -119,12 +144,16 @@ final class InterstitialAdService: NSObject, FullScreenContentDelegate {
             return
         }
 
-        activeSlotKey = slot.key
-        activeFormat = .splashInterstitial
-        self.onShown = onShown
-        self.onDismissed = onDismissed
-        self.onFailed = onFailed
-        autoReload = nil
+        if let cachedAd = cachedAd(for: slot, format: .splashInterstitial) {
+            activeSlotKey = slot.key
+            activeFormat = .splashInterstitial
+            self.onShown = onShown
+            self.onDismissed = onDismissed
+            self.onFailed = onFailed
+            autoReload = nil
+            cachedAd.ad.present(from: rootViewController)
+            return
+        }
 
         let state = SplashLoadState()
         let timeout = DispatchWorkItem { [weak self] in
@@ -140,6 +169,43 @@ final class InterstitialAdService: NSObject, FullScreenContentDelegate {
             execute: timeout
         )
 
+        if isLoading(slot: slot, format: .splashInterstitial) {
+            guard activeSlotKey == nil else {
+                timeout.cancel()
+                onDismissed?()
+                return
+            }
+
+            activeSlotKey = slot.key
+            activeFormat = .splashInterstitial
+            self.onShown = onShown
+            self.onDismissed = onDismissed
+            self.onFailed = onFailed
+            autoReload = nil
+
+            appendPendingLoadCallback({ [weak self] in
+                guard let self, !state.didFinish else { return }
+                state.didFinish = true
+                timeout.cancel()
+                guard let cachedAd = self.cachedAd(for: slot, format: .splashInterstitial) else {
+                    self.onFailed?(AdsKitError.loadFailed("Failed to load splash interstitial for slot '\(slot.key)'"))
+                    self.onDismissed?()
+                    self.resetPresentationCallbacks()
+                    return
+                }
+                cachedAd.ad.present(from: rootViewController)
+            }, slot: slot, format: .splashInterstitial)
+            return
+        }
+
+        activeSlotKey = slot.key
+        activeFormat = .splashInterstitial
+        self.onShown = onShown
+        self.onDismissed = onDismissed
+        self.onFailed = onFailed
+        autoReload = nil
+
+        startLoading(slot: slot, format: .splashInterstitial)
         loadSplash(
             slot: slot,
             placements: placements,
@@ -156,28 +222,30 @@ final class InterstitialAdService: NSObject, FullScreenContentDelegate {
         slot: AdsSlot,
         placements: [AdsPlacement],
         index: Int,
+        format: AdsFormat,
         retryPolicy: AdsRetryPolicy,
-        runtimeContext: AdsRuntimeContext,
-        onLoaded: (() -> Void)?
+        runtimeContext: AdsRuntimeContext
     ) {
         guard placements.indices.contains(index) else {
-            scheduleRetry(
+            stopLoading(slot: slot, format: format)
+            if !scheduleRetry(
                 slot: slot,
+                format: format,
                 retryPolicy: retryPolicy,
-                runtimeContext: runtimeContext,
-                onLoaded: onLoaded
-            )
+                runtimeContext: runtimeContext
+            ) {
+                finishPendingLoadCallbacks(slot: slot, format: format, didLoad: false)
+            }
             return
         }
 
-        isLoading = true
         let placement = placements[index]
         reporter.record(
             AdsEvent(
                 kind: .loadRequested,
                 slotKey: slot.key,
                 adUnitId: placement.id,
-                format: .interstitial,
+                format: format,
                 timestampMs: Int64(runtimeContext.nowProvider().timeIntervalSince1970 * 1000)
             )
         )
@@ -186,77 +254,93 @@ final class InterstitialAdService: NSObject, FullScreenContentDelegate {
             with: placement.id,
             request: Request()
         ) { [weak self] ad, error in
-            guard let self else { return }
-            self.isLoading = false
+            Task { @MainActor [weak self] in
+                guard let self else { return }
 
-            if let error {
+                if let error {
+                    self.reporter.record(
+                        AdsEvent(
+                            kind: .loadFailed,
+                            slotKey: slot.key,
+                            adUnitId: placement.id,
+                            format: format,
+                            message: error.localizedDescription,
+                            timestampMs: Int64(runtimeContext.nowProvider().timeIntervalSince1970 * 1000),
+                            metadata: AdsErrorMetadata.make(from: error)
+                        )
+                    )
+                    self.loadInterstitial(
+                        slot: slot,
+                        placements: placements,
+                        index: index + 1,
+                        format: format,
+                        retryPolicy: retryPolicy,
+                        runtimeContext: runtimeContext
+                    )
+                    return
+                }
+
+                guard let ad else {
+                    self.loadInterstitial(
+                        slot: slot,
+                        placements: placements,
+                        index: index + 1,
+                        format: format,
+                        retryPolicy: retryPolicy,
+                        runtimeContext: runtimeContext
+                    )
+                    return
+                }
+
+                self.retryAttemptsBySlot[self.loadingKey(slot: slot, format: format)] = 0
+                self.setCachedAd(ad, adUnitID: placement.id, slot: slot, format: format)
+                ad.fullScreenContentDelegate = self
+                ad.paidEventHandler = { @MainActor [weak self, weak ad] adValue in
+                    self?.recordPaidEvent(
+                        slotKey: slot.key,
+                        format: format,
+                        adUnitId: placement.id,
+                        adapterName: ad?.responseInfo.loadedAdNetworkResponseInfo?.adNetworkClassName,
+                        adValue: adValue,
+                        runtimeContext: runtimeContext
+                    )
+                }
                 self.reporter.record(
                     AdsEvent(
-                        kind: .loadFailed,
+                        kind: .loadSucceeded,
                         slotKey: slot.key,
                         adUnitId: placement.id,
-                        format: .interstitial,
-                        message: error.localizedDescription,
-                        timestampMs: Int64(runtimeContext.nowProvider().timeIntervalSince1970 * 1000),
-                        metadata: AdsErrorMetadata.make(from: error)
+                        format: format,
+                        timestampMs: Int64(runtimeContext.nowProvider().timeIntervalSince1970 * 1000)
                     )
                 )
-                self.loadInterstitial(
-                    slot: slot,
-                    placements: placements,
-                    index: index + 1,
-                    retryPolicy: retryPolicy,
-                    runtimeContext: runtimeContext,
-                    onLoaded: onLoaded
-                )
-                return
+                self.stopLoading(slot: slot, format: format)
+                self.finishPendingLoadCallbacks(slot: slot, format: format, didLoad: true)
             }
-
-            self.retryAttemptsBySlot[slot.key] = 0
-            self.interstitialAd = ad
-            self.interstitialAd?.fullScreenContentDelegate = self
-            self.interstitialAd?.paidEventHandler = { [weak self] adValue in
-                self?.recordPaidEvent(
-                    slotKey: slot.key,
-                    format: .interstitial,
-                    adUnitId: placement.id,
-                    adapterName: self?.interstitialAd?.responseInfo.loadedAdNetworkResponseInfo?.adNetworkClassName,
-                    adValue: adValue,
-                    runtimeContext: runtimeContext
-                )
-            }
-            self.reporter.record(
-                AdsEvent(
-                    kind: .loadSucceeded,
-                    slotKey: slot.key,
-                    adUnitId: placement.id,
-                    format: .interstitial,
-                    timestampMs: Int64(runtimeContext.nowProvider().timeIntervalSince1970 * 1000)
-                )
-            )
-            onLoaded?()
         }
     }
 
+    @discardableResult
     private func scheduleRetry(
         slot: AdsSlot,
+        format: AdsFormat,
         retryPolicy: AdsRetryPolicy,
-        runtimeContext: AdsRuntimeContext,
-        onLoaded: (() -> Void)?
-    ) {
-        let attempts = retryAttemptsBySlot[slot.key] ?? 0
-        guard attempts + 1 < retryPolicy.maxAttempts else { return }
-        retryAttemptsBySlot[slot.key] = attempts + 1
+        runtimeContext: AdsRuntimeContext
+    ) -> Bool {
+        let key = loadingKey(slot: slot, format: format)
+        let attempts = retryAttemptsBySlot[key] ?? 0
+        guard attempts + 1 < retryPolicy.maxAttempts else { return false }
+        retryAttemptsBySlot[key] = attempts + 1
 
         DispatchQueue.main.asyncAfter(deadline: .now() + retryPolicy.loadRetryDelaySeconds) { [weak self] in
             guard let self else { return }
             self.load(
                 slot: slot,
                 retryPolicy: retryPolicy,
-                runtimeContext: runtimeContext,
-                onLoaded: onLoaded
+                runtimeContext: runtimeContext
             )
         }
+        return true
     }
 
     private func loadSplash(
@@ -272,6 +356,8 @@ final class InterstitialAdService: NSObject, FullScreenContentDelegate {
         guard placements.indices.contains(index) else {
             state.didFinish = true
             timeout.cancel()
+            stopLoading(slot: slot, format: .splashInterstitial)
+            finishPendingLoadCallbacks(slot: slot, format: .splashInterstitial, didLoad: false)
             onFailed?(AdsKitError.loadFailed("Failed to load splash interstitial for slot '\(slot.key)'"))
             onDismissed?()
             resetPresentationCallbacks()
@@ -293,58 +379,76 @@ final class InterstitialAdService: NSObject, FullScreenContentDelegate {
             with: placement.id,
             request: Request()
         ) { [weak self] ad, error in
-            guard let self, !state.didFinish else { return }
+            Task { @MainActor [weak self] in
+                guard let self, !state.didFinish else { return }
 
-            if let error {
+                if let error {
+                    self.reporter.record(
+                        AdsEvent(
+                            kind: .loadFailed,
+                            slotKey: slot.key,
+                            adUnitId: placement.id,
+                            format: .splashInterstitial,
+                            message: error.localizedDescription,
+                            timestampMs: Int64(runtimeContext.nowProvider().timeIntervalSince1970 * 1000),
+                            metadata: AdsErrorMetadata.make(from: error)
+                        )
+                    )
+                    self.loadSplash(
+                        slot: slot,
+                        placements: placements,
+                        index: index + 1,
+                        rootViewController: rootViewController,
+                        timeout: timeout,
+                        state: state,
+                        retryPolicy: retryPolicy,
+                        runtimeContext: runtimeContext
+                    )
+                    return
+                }
+
+                guard let ad else {
+                    self.loadSplash(
+                        slot: slot,
+                        placements: placements,
+                        index: index + 1,
+                        rootViewController: rootViewController,
+                        timeout: timeout,
+                        state: state,
+                        retryPolicy: retryPolicy,
+                        runtimeContext: runtimeContext
+                    )
+                    return
+                }
+
+                state.didFinish = true
+                timeout.cancel()
+                self.retryAttemptsBySlot[self.loadingKey(slot: slot, format: .splashInterstitial)] = 0
+                self.setCachedAd(ad, adUnitID: placement.id, slot: slot, format: .splashInterstitial)
+                ad.fullScreenContentDelegate = self
+                ad.paidEventHandler = { @MainActor [weak self, weak ad] adValue in
+                    self?.recordPaidEvent(
+                        slotKey: slot.key,
+                        format: .splashInterstitial,
+                        adUnitId: placement.id,
+                        adapterName: ad?.responseInfo.loadedAdNetworkResponseInfo?.adNetworkClassName,
+                        adValue: adValue,
+                        runtimeContext: runtimeContext
+                    )
+                }
                 self.reporter.record(
                     AdsEvent(
-                        kind: .loadFailed,
+                        kind: .loadSucceeded,
                         slotKey: slot.key,
                         adUnitId: placement.id,
                         format: .splashInterstitial,
-                        message: error.localizedDescription,
-                        timestampMs: Int64(runtimeContext.nowProvider().timeIntervalSince1970 * 1000),
-                        metadata: AdsErrorMetadata.make(from: error)
+                        timestampMs: Int64(runtimeContext.nowProvider().timeIntervalSince1970 * 1000)
                     )
                 )
-                self.loadSplash(
-                    slot: slot,
-                    placements: placements,
-                    index: index + 1,
-                    rootViewController: rootViewController,
-                    timeout: timeout,
-                    state: state,
-                    retryPolicy: retryPolicy,
-                    runtimeContext: runtimeContext
-                )
-                return
+                self.stopLoading(slot: slot, format: .splashInterstitial)
+                self.finishPendingLoadCallbacks(slot: slot, format: .splashInterstitial, didLoad: true)
+                ad.present(from: rootViewController)
             }
-
-            state.didFinish = true
-            timeout.cancel()
-            self.retryAttemptsBySlot[slot.key] = 0
-            self.splashInterstitialAd = ad
-            self.splashInterstitialAd?.fullScreenContentDelegate = self
-            self.splashInterstitialAd?.paidEventHandler = { [weak self] adValue in
-                self?.recordPaidEvent(
-                    slotKey: slot.key,
-                    format: .splashInterstitial,
-                    adUnitId: placement.id,
-                    adapterName: self?.splashInterstitialAd?.responseInfo.loadedAdNetworkResponseInfo?.adNetworkClassName,
-                    adValue: adValue,
-                    runtimeContext: runtimeContext
-                )
-            }
-            self.reporter.record(
-                AdsEvent(
-                    kind: .loadSucceeded,
-                    slotKey: slot.key,
-                    adUnitId: placement.id,
-                    format: .splashInterstitial,
-                    timestampMs: Int64(runtimeContext.nowProvider().timeIntervalSince1970 * 1000)
-                )
-            )
-            ad?.present(from: rootViewController)
         }
     }
 
@@ -372,9 +476,9 @@ final class InterstitialAdService: NSObject, FullScreenContentDelegate {
             )
         )
         if activeFormat == .splashInterstitial {
-            splashInterstitialAd = nil
+            removeCachedAd(slotKey: activeSlotKey, format: .splashInterstitial)
         } else {
-            interstitialAd = nil
+            removeCachedAd(slotKey: activeSlotKey, format: .interstitial)
             autoReload?()
         }
 
@@ -399,9 +503,9 @@ final class InterstitialAdService: NSObject, FullScreenContentDelegate {
             )
         )
         if activeFormat == .splashInterstitial {
-            splashInterstitialAd = nil
+            removeCachedAd(slotKey: activeSlotKey, format: .splashInterstitial)
         } else {
-            interstitialAd = nil
+            removeCachedAd(slotKey: activeSlotKey, format: .interstitial)
         }
         resetPresentationCallbacks()
     }
@@ -455,5 +559,89 @@ final class InterstitialAdService: NSObject, FullScreenContentDelegate {
         onDismissed = nil
         onFailed = nil
         autoReload = nil
+    }
+
+    private func cacheFormat(for slot: AdsSlot) -> AdsFormat {
+        slot.format == .splashInterstitial ? .splashInterstitial : .interstitial
+    }
+
+    private func cachedAd(for slot: AdsSlot, format: AdsFormat) -> CachedInterstitialAd? {
+        let cachedAd: CachedInterstitialAd?
+        switch format {
+        case .splashInterstitial:
+            cachedAd = splashInterstitialAdsBySlot[slot.key]
+        default:
+            cachedAd = interstitialAdsBySlot[slot.key]
+        }
+
+        guard let cachedAd else { return nil }
+        let validAdUnitIDs = Set(AdsPlacementResolver.loadOrder(for: slot).map(\.id))
+        guard validAdUnitIDs.contains(cachedAd.adUnitID) else {
+            removeCachedAd(slotKey: slot.key, format: format)
+            return nil
+        }
+        return cachedAd
+    }
+
+    private func setCachedAd(
+        _ ad: InterstitialAd,
+        adUnitID: String,
+        slot: AdsSlot,
+        format: AdsFormat
+    ) {
+        let cachedAd = CachedInterstitialAd(ad: ad, adUnitID: adUnitID)
+        switch format {
+        case .splashInterstitial:
+            splashInterstitialAdsBySlot[slot.key] = cachedAd
+        default:
+            interstitialAdsBySlot[slot.key] = cachedAd
+        }
+    }
+
+    private func removeCachedAd(slotKey: String?, format: AdsFormat?) {
+        guard let slotKey, let format else { return }
+        switch format {
+        case .splashInterstitial:
+            splashInterstitialAdsBySlot[slotKey] = nil
+        default:
+            interstitialAdsBySlot[slotKey] = nil
+        }
+    }
+
+    private func loadingKey(slot: AdsSlot, format: AdsFormat) -> String {
+        "\(format.rawValue)|\(slot.key)"
+    }
+
+    private func isLoading(slot: AdsSlot, format: AdsFormat) -> Bool {
+        loadingKeys.contains(loadingKey(slot: slot, format: format))
+    }
+
+    private func startLoading(slot: AdsSlot, format: AdsFormat) {
+        loadingKeys.insert(loadingKey(slot: slot, format: format))
+    }
+
+    private func stopLoading(slot: AdsSlot, format: AdsFormat) {
+        loadingKeys.remove(loadingKey(slot: slot, format: format))
+    }
+
+    private func appendPendingLoadCallback(
+        _ callback: (() -> Void)?,
+        slot: AdsSlot,
+        format: AdsFormat
+    ) {
+        guard let callback else { return }
+        pendingLoadCallbacksByKey[loadingKey(slot: slot, format: format), default: []].append(callback)
+    }
+
+    private func finishPendingLoadCallbacks(
+        slot: AdsSlot,
+        format: AdsFormat,
+        didLoad: Bool
+    ) {
+        let key = loadingKey(slot: slot, format: format)
+        let callbacks = pendingLoadCallbacksByKey[key] ?? []
+        pendingLoadCallbacksByKey[key] = nil
+        guard didLoad else { return }
+        callbacks.forEach { $0() }
     }
 }

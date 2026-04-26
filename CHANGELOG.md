@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.8
+
+- Scoped interstitial, splash interstitial, rewarded, and app-open caches and in-flight load guards by `slotKey`, preventing one logical slot from reusing or presenting another slot's cached fullscreen ad.
+- Made splash interstitial presentation consume a matching preloaded splash cache before starting an on-demand request.
+- Added `AdsKitManager.hasLoadedInterstitial`, `hasLoadedRewarded`, `hasLoadedAppOpen`, and `hasLoadedNative` readiness checks.
+- Scoped native shared cache and request throttling by `slotKey` plus placement id, and skipped non-forced native refreshes while a slot already has a loaded ad.
+
 ## 1.0.7
 
 - Capped the default `BannerAdsView` adaptive size to the standard banner envelope when no explicit `adSize` is provided, preventing wide containers from creating oversized banners that clip content or break surrounding layout.

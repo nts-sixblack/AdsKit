@@ -4,11 +4,21 @@ import UIKit
 
 @MainActor
 final class AppOpenAdService: NSObject, FullScreenContentDelegate {
+    private struct CachedAppOpenAd {
+        let ad: AppOpenAd
+        let adUnitID: String
+    }
+
     private let reporter: AdsEventReporter
 
-    private(set) var appOpenAd: AppOpenAd?
+    var appOpenAd: AppOpenAd? {
+        appOpenAdsBySlot.values.first?.ad
+    }
+
     private(set) var isShowingAppOpenAd = false
-    private var isLoading = false
+    private var appOpenAdsBySlot: [String: CachedAppOpenAd] = [:]
+    private var loadingSlotKeys: Set<String> = []
+    private var pendingLoadCallbacksBySlot: [String: [() -> Void]] = [:]
 
     private var activeSlotKey: String?
     private var onShown: (() -> Void)?
@@ -18,22 +28,30 @@ final class AppOpenAdService: NSObject, FullScreenContentDelegate {
         self.reporter = reporter
     }
 
+    func hasCachedAd(for slot: AdsSlot) -> Bool {
+        cachedAd(for: slot) != nil
+    }
+
     func load(
         slot: AdsSlot,
         runtimeContext: AdsRuntimeContext,
         onLoaded: (() -> Void)? = nil
     ) {
-        guard appOpenAd == nil else {
+        guard cachedAd(for: slot) == nil else {
             onLoaded?()
             return
         }
-        guard !isLoading else { return }
+        guard !isLoading(slot: slot) else {
+            appendPendingLoadCallback(onLoaded, slot: slot)
+            return
+        }
         let placements = AdsPlacementResolver.loadOrder(for: slot)
         guard !placements.isEmpty else {
             onLoaded?()
             return
         }
-        isLoading = true
+        startLoading(slot: slot)
+        appendPendingLoadCallback(onLoaded, slot: slot)
         loadAppOpen(
             slot: slot,
             placements: placements,
@@ -55,11 +73,11 @@ final class AppOpenAdService: NSObject, FullScreenContentDelegate {
             return
         }
 
-        if let appOpenAd {
+        if let cachedAd = cachedAd(for: slot) {
             self.onShown = onShown
             self.onDismissed = onDismissed
             activeSlotKey = slot.key
-            appOpenAd.present(from: rootViewController)
+            cachedAd.ad.present(from: rootViewController)
             return
         }
 
@@ -74,7 +92,7 @@ final class AppOpenAdService: NSObject, FullScreenContentDelegate {
             return
         }
 
-        guard !isLoading else {
+        guard !isLoading(slot: slot) else {
             onDismissed?()
             return
         }
@@ -82,7 +100,7 @@ final class AppOpenAdService: NSObject, FullScreenContentDelegate {
         self.onShown = onShown
         self.onDismissed = onDismissed
         activeSlotKey = slot.key
-        isLoading = true
+        startLoading(slot: slot)
         loadAndPresent(
             slot: slot,
             placements: placements,
@@ -100,7 +118,7 @@ final class AppOpenAdService: NSObject, FullScreenContentDelegate {
         onLoaded: (() -> Void)?
     ) {
         guard placements.indices.contains(index) else {
-            isLoading = false
+            finishLoadingAppOpen(slot: slot, didLoad: false)
             return
         }
         let placement = placements[index]
@@ -114,57 +132,61 @@ final class AppOpenAdService: NSObject, FullScreenContentDelegate {
             )
         )
         AppOpenAd.load(with: placement.id, request: Request()) { [weak self] ad, error in
-            guard let self else { return }
-            if let error {
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                if let error {
+                    self.reporter.record(
+                        AdsEvent(
+                            kind: .loadFailed,
+                            slotKey: slot.key,
+                            adUnitId: placement.id,
+                            format: .appOpen,
+                            message: error.localizedDescription,
+                            timestampMs: Int64(runtimeContext.nowProvider().timeIntervalSince1970 * 1000),
+                            metadata: AdsErrorMetadata.make(from: error)
+                        )
+                    )
+                    self.loadAppOpen(
+                        slot: slot,
+                        placements: placements,
+                        index: index + 1,
+                        runtimeContext: runtimeContext,
+                        onLoaded: onLoaded
+                    )
+                    return
+                }
+                guard let ad else {
+                    self.finishLoadingAppOpen(slot: slot, didLoad: false)
+                    return
+                }
+                self.setCachedAd(ad, adUnitID: placement.id, slot: slot)
+                ad.fullScreenContentDelegate = self
+                ad.paidEventHandler = { @MainActor [weak self, weak ad] adValue in
+                    self?.reporter.record(
+                        AdsEvent(
+                            kind: .paidImpression,
+                            slotKey: slot.key,
+                            adUnitId: placement.id,
+                            format: .appOpen,
+                            mediationAdapterClassName: ad?.responseInfo.loadedAdNetworkResponseInfo?.adNetworkClassName,
+                            valueMicros: adValue.value.doubleValue,
+                            precision: adValue.precision.rawValue,
+                            currencyCode: adValue.currencyCode,
+                            timestampMs: Int64(runtimeContext.nowProvider().timeIntervalSince1970 * 1000)
+                        )
+                    )
+                }
                 self.reporter.record(
                     AdsEvent(
-                        kind: .loadFailed,
+                        kind: .loadSucceeded,
                         slotKey: slot.key,
                         adUnitId: placement.id,
                         format: .appOpen,
-                        message: error.localizedDescription,
-                        timestampMs: Int64(runtimeContext.nowProvider().timeIntervalSince1970 * 1000),
-                        metadata: AdsErrorMetadata.make(from: error)
-                    )
-                )
-                self.loadAppOpen(
-                    slot: slot,
-                    placements: placements,
-                    index: index + 1,
-                    runtimeContext: runtimeContext,
-                    onLoaded: onLoaded
-                )
-                return
-            }
-            self.isLoading = false
-            guard let ad else { return }
-            self.appOpenAd = ad
-            self.appOpenAd?.fullScreenContentDelegate = self
-            self.appOpenAd?.paidEventHandler = { [weak self] adValue in
-                self?.reporter.record(
-                    AdsEvent(
-                        kind: .paidImpression,
-                        slotKey: slot.key,
-                        adUnitId: placement.id,
-                        format: .appOpen,
-                        mediationAdapterClassName: self?.appOpenAd?.responseInfo.loadedAdNetworkResponseInfo?.adNetworkClassName,
-                        valueMicros: adValue.value.doubleValue,
-                        precision: adValue.precision.rawValue,
-                        currencyCode: adValue.currencyCode,
                         timestampMs: Int64(runtimeContext.nowProvider().timeIntervalSince1970 * 1000)
                     )
                 )
+                self.finishLoadingAppOpen(slot: slot, didLoad: true)
             }
-            self.reporter.record(
-                AdsEvent(
-                    kind: .loadSucceeded,
-                    slotKey: slot.key,
-                    adUnitId: placement.id,
-                    format: .appOpen,
-                    timestampMs: Int64(runtimeContext.nowProvider().timeIntervalSince1970 * 1000)
-                )
-            )
-            onLoaded?()
         }
     }
 
@@ -176,7 +198,7 @@ final class AppOpenAdService: NSObject, FullScreenContentDelegate {
         runtimeContext: AdsRuntimeContext
     ) {
         guard placements.indices.contains(index) else {
-            isLoading = false
+            finishLoadingAppOpen(slot: slot, didLoad: false)
             finishWithoutPresentation()
             return
         }
@@ -193,62 +215,65 @@ final class AppOpenAdService: NSObject, FullScreenContentDelegate {
         )
 
         AppOpenAd.load(with: placement.id, request: Request()) { [weak self] ad, error in
-            guard let self else { return }
-            if let error {
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                if let error {
+                    self.reporter.record(
+                        AdsEvent(
+                            kind: .loadFailed,
+                            slotKey: slot.key,
+                            adUnitId: placement.id,
+                            format: .appOpen,
+                            message: error.localizedDescription,
+                            timestampMs: Int64(runtimeContext.nowProvider().timeIntervalSince1970 * 1000),
+                            metadata: AdsErrorMetadata.make(from: error)
+                        )
+                    )
+                    self.loadAndPresent(
+                        slot: slot,
+                        placements: placements,
+                        index: index + 1,
+                        rootViewController: rootViewController,
+                        runtimeContext: runtimeContext
+                    )
+                    return
+                }
+
+                guard let ad else {
+                    self.finishLoadingAppOpen(slot: slot, didLoad: false)
+                    self.finishWithoutPresentation()
+                    return
+                }
+
+                self.setCachedAd(ad, adUnitID: placement.id, slot: slot)
+                ad.fullScreenContentDelegate = self
+                ad.paidEventHandler = { @MainActor [weak self, weak ad] adValue in
+                    self?.reporter.record(
+                        AdsEvent(
+                            kind: .paidImpression,
+                            slotKey: slot.key,
+                            adUnitId: placement.id,
+                            format: .appOpen,
+                            mediationAdapterClassName: ad?.responseInfo.loadedAdNetworkResponseInfo?.adNetworkClassName,
+                            valueMicros: adValue.value.doubleValue,
+                            precision: adValue.precision.rawValue,
+                            currencyCode: adValue.currencyCode,
+                            timestampMs: Int64(runtimeContext.nowProvider().timeIntervalSince1970 * 1000)
+                        )
+                    )
+                }
                 self.reporter.record(
                     AdsEvent(
-                        kind: .loadFailed,
+                        kind: .loadSucceeded,
                         slotKey: slot.key,
                         adUnitId: placement.id,
                         format: .appOpen,
-                        message: error.localizedDescription,
-                        timestampMs: Int64(runtimeContext.nowProvider().timeIntervalSince1970 * 1000),
-                        metadata: AdsErrorMetadata.make(from: error)
-                    )
-                )
-                self.loadAndPresent(
-                    slot: slot,
-                    placements: placements,
-                    index: index + 1,
-                    rootViewController: rootViewController,
-                    runtimeContext: runtimeContext
-                )
-                return
-            }
-
-            self.isLoading = false
-            guard let ad else {
-                self.finishWithoutPresentation()
-                return
-            }
-
-            self.appOpenAd = ad
-            self.appOpenAd?.fullScreenContentDelegate = self
-            self.appOpenAd?.paidEventHandler = { [weak self] adValue in
-                self?.reporter.record(
-                    AdsEvent(
-                        kind: .paidImpression,
-                        slotKey: slot.key,
-                        adUnitId: placement.id,
-                        format: .appOpen,
-                        mediationAdapterClassName: self?.appOpenAd?.responseInfo.loadedAdNetworkResponseInfo?.adNetworkClassName,
-                        valueMicros: adValue.value.doubleValue,
-                        precision: adValue.precision.rawValue,
-                        currencyCode: adValue.currencyCode,
                         timestampMs: Int64(runtimeContext.nowProvider().timeIntervalSince1970 * 1000)
                     )
                 )
+                self.finishLoadingAppOpen(slot: slot, didLoad: true)
+                ad.present(from: rootViewController)
             }
-            self.reporter.record(
-                AdsEvent(
-                    kind: .loadSucceeded,
-                    slotKey: slot.key,
-                    adUnitId: placement.id,
-                    format: .appOpen,
-                    timestampMs: Int64(runtimeContext.nowProvider().timeIntervalSince1970 * 1000)
-                )
-            )
-            ad.present(from: rootViewController)
         }
     }
 
@@ -278,7 +303,7 @@ final class AppOpenAdService: NSObject, FullScreenContentDelegate {
                 timestampMs: Int64(Date().timeIntervalSince1970 * 1000)
             )
         )
-        appOpenAd = nil
+        removeCachedAd(slotKey: activeSlotKey)
         onDismissed?()
         onDismissed = nil
         onShown = nil
@@ -301,7 +326,7 @@ final class AppOpenAdService: NSObject, FullScreenContentDelegate {
                 metadata: AdsErrorMetadata.make(from: error)
             )
         )
-        appOpenAd = nil
+        removeCachedAd(slotKey: activeSlotKey)
         onDismissed?()
         onDismissed = nil
         onShown = nil
@@ -325,5 +350,45 @@ final class AppOpenAdService: NSObject, FullScreenContentDelegate {
         onDismissed = nil
         onShown = nil
         activeSlotKey = nil
+    }
+
+    private func cachedAd(for slot: AdsSlot) -> CachedAppOpenAd? {
+        guard let cachedAd = appOpenAdsBySlot[slot.key] else { return nil }
+        let validAdUnitIDs = Set(AdsPlacementResolver.loadOrder(for: slot).map(\.id))
+        guard validAdUnitIDs.contains(cachedAd.adUnitID) else {
+            removeCachedAd(slotKey: slot.key)
+            return nil
+        }
+        return cachedAd
+    }
+
+    private func setCachedAd(_ ad: AppOpenAd, adUnitID: String, slot: AdsSlot) {
+        appOpenAdsBySlot[slot.key] = CachedAppOpenAd(ad: ad, adUnitID: adUnitID)
+    }
+
+    private func removeCachedAd(slotKey: String?) {
+        guard let slotKey else { return }
+        appOpenAdsBySlot[slotKey] = nil
+    }
+
+    private func isLoading(slot: AdsSlot) -> Bool {
+        loadingSlotKeys.contains(slot.key)
+    }
+
+    private func startLoading(slot: AdsSlot) {
+        loadingSlotKeys.insert(slot.key)
+    }
+
+    private func finishLoadingAppOpen(slot: AdsSlot, didLoad: Bool) {
+        loadingSlotKeys.remove(slot.key)
+        let callbacks = pendingLoadCallbacksBySlot[slot.key] ?? []
+        pendingLoadCallbacksBySlot[slot.key] = nil
+        guard didLoad else { return }
+        callbacks.forEach { $0() }
+    }
+
+    private func appendPendingLoadCallback(_ callback: (() -> Void)?, slot: AdsSlot) {
+        guard let callback else { return }
+        pendingLoadCallbacksBySlot[slot.key, default: []].append(callback)
     }
 }

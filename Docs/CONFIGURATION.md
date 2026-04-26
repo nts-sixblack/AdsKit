@@ -66,7 +66,18 @@ Pass `adSize:` when the host app needs a fixed, larger, or custom Google Mobile 
 
 You can still preload one native slot directly with `AdsKitManager.preloadNative(slotKey:)`.
 
-Native preloads respect the native request interval across every enabled placement in the slot's load order. `preloadNative(slotKey:)` only records `preload_created` when a new native request actually starts.
+Fullscreen preloads are cached per slot key and validated against the slot's current enabled placements before being reused. A cached interstitial, rewarded, app-open, or splash interstitial ad for one slot key is not presented for another slot key.
+
+Native preloads are also scoped by slot key. `refreshNative(slotKey:)` does not request a new native ad while that slot's view model already has an ad; use `refreshNative(slotKey:force: true)` when you intentionally want to replace it. `preloadNative(slotKey:)` only records `preload_created` when a new native request actually starts.
+
+You can inspect cache readiness without triggering a load:
+
+```swift
+adsManager.hasLoadedInterstitial(slotKey: "share_inter")
+adsManager.hasLoadedRewarded(slotKey: "coins_rewarded")
+adsManager.hasLoadedAppOpen(slotKey: "launch_app_open")
+adsManager.hasLoadedNative(slotKey: "language_native")
+```
 
 Example:
 
