@@ -1,5 +1,12 @@
 # Updating AdsKit
 
+## From 1.0.8 to 1.0.9
+
+- No migration is required for existing splash interstitial call sites.
+- `AdsSplashInterstitialPolicy` now includes `autoReloadAfterDismiss`, defaulting to `false`.
+- Set `autoReloadAfterDismiss` to `true` only when the host app wants splash interstitials to request their next ad after the current splash ad has fully dismissed.
+- If splash interstitial policy is driven by remote config, add the new boolean there only when you need to override the default behavior.
+
 ## From 1.0.7 to 1.0.8
 
 - No API migration is required for existing load/show calls.

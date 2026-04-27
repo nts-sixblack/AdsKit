@@ -44,6 +44,7 @@ Pass `adSize:` when the host app needs a fixed, larger, or custom Google Mobile 
 - `splashInterstitial`
   - `isEnabled`
   - `loadTimeoutSeconds`
+  - `autoReloadAfterDismiss`
 - `appOpen`
   - `waitForSecondOpportunity`
   - `minimumIntervalBetweenShowsSeconds`
@@ -67,6 +68,8 @@ Pass `adSize:` when the host app needs a fixed, larger, or custom Google Mobile 
 You can still preload one native slot directly with `AdsKitManager.preloadNative(slotKey:)`.
 
 Fullscreen preloads are cached per slot key and validated against the slot's current enabled placements before being reused. A cached interstitial, rewarded, app-open, or splash interstitial ad for one slot key is not presented for another slot key.
+
+When `policies.splashInterstitial.autoReloadAfterDismiss` is `true`, AdsKit requests the next splash interstitial only after the current splash ad has finished dismissing.
 
 Native preloads are also scoped by slot key. `refreshNative(slotKey:)` does not request a new native ad while that slot's view model already has an ad; use `refreshNative(slotKey:force: true)` when you intentionally want to replace it. `preloadNative(slotKey:)` only records `preload_created` when a new native request actually starts.
 

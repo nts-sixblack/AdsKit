@@ -18,21 +18,42 @@ public final class AdsKitManager: NSObject, ObservableObject {
     private var decisionState = AdsDecisionState()
     private var nativeViewModels: [String: NativeAdViewModel] = [:]
 
-    public init(
+    public convenience init(
         configuration: AdsConfiguration = .init(),
         runtimeContext: AdsRuntimeContext = .init(),
         eventSink: AdsEventSink? = nil
     ) {
-        self.configuration = configuration
-        self.runtimeContext = runtimeContext
-        eventReporter = AdsEventReporter(
+        let eventReporter = AdsEventReporter(
             sink: eventSink,
             debugOptions: configuration.debug
         )
-        bannerAdService = BannerAdService()
-        interstitialAdService = InterstitialAdService(reporter: eventReporter)
-        rewardedAdService = RewardedAdService(reporter: eventReporter)
-        appOpenAdService = AppOpenAdService(reporter: eventReporter)
+        self.init(
+            configuration: configuration,
+            runtimeContext: runtimeContext,
+            eventReporter: eventReporter,
+            bannerAdService: BannerAdService(),
+            interstitialAdService: InterstitialAdService(reporter: eventReporter),
+            rewardedAdService: RewardedAdService(reporter: eventReporter),
+            appOpenAdService: AppOpenAdService(reporter: eventReporter)
+        )
+    }
+
+    init(
+        configuration: AdsConfiguration,
+        runtimeContext: AdsRuntimeContext,
+        eventReporter: AdsEventReporter,
+        bannerAdService: BannerAdService,
+        interstitialAdService: InterstitialAdService,
+        rewardedAdService: RewardedAdService,
+        appOpenAdService: AppOpenAdService
+    ) {
+        self.configuration = configuration
+        self.runtimeContext = runtimeContext
+        self.eventReporter = eventReporter
+        self.bannerAdService = bannerAdService
+        self.interstitialAdService = interstitialAdService
+        self.rewardedAdService = rewardedAdService
+        self.appOpenAdService = appOpenAdService
         super.init()
     }
 
@@ -299,7 +320,10 @@ public final class AdsKitManager: NSObject, ObservableObject {
             onFailed: { [weak self] error in
                 self?.isShowingFullscreenAd = false
                 onFailed?(error)
-            }
+            },
+            autoReload: configuration.policies.splashInterstitial.autoReloadAfterDismiss ? { [weak self] in
+                self?.loadInterstitial(slotKey: slot.key)
+            } : nil
         )
     }
 

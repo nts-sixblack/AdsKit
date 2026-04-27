@@ -225,6 +225,45 @@ final class AdsKitManagerTests: XCTestCase {
         XCTAssertEqual(manualNativePreloadEvents.count, 1)
     }
 
+    func testShowSplashInterstitialDoesNotSetReloadCallbackByDefault() {
+        let reporter = AdsEventReporter(sink: nil, debugOptions: .init())
+        let interstitialService = SpyInterstitialAdService(reporter: reporter)
+        let manager = AdsKitManager(
+            configuration: makeSplashConfiguration(),
+            runtimeContext: makeRuntimeContext(now: 60),
+            eventReporter: reporter,
+            bannerAdService: BannerAdService(),
+            interstitialAdService: interstitialService,
+            rewardedAdService: RewardedAdService(reporter: reporter),
+            appOpenAdService: AppOpenAdService(reporter: reporter)
+        )
+
+        manager.showSplashInterstitial(slotKey: "splash_inter")
+
+        XCTAssertEqual(interstitialService.shownSplashSlotKeys, ["splash_inter"])
+        XCTAssertNil(interstitialService.lastSplashAutoReload)
+    }
+
+    func testShowSplashInterstitialReloadCallbackLoadsSameSlotWhenEnabled() {
+        let reporter = AdsEventReporter(sink: nil, debugOptions: .init())
+        let interstitialService = SpyInterstitialAdService(reporter: reporter)
+        let manager = AdsKitManager(
+            configuration: makeSplashConfiguration(autoReloadAfterDismiss: true),
+            runtimeContext: makeRuntimeContext(now: 70),
+            eventReporter: reporter,
+            bannerAdService: BannerAdService(),
+            interstitialAdService: interstitialService,
+            rewardedAdService: RewardedAdService(reporter: reporter),
+            appOpenAdService: AppOpenAdService(reporter: reporter)
+        )
+
+        manager.showSplashInterstitial(slotKey: "splash_inter")
+        interstitialService.lastSplashAutoReload?()
+
+        XCTAssertEqual(interstitialService.shownSplashSlotKeys, ["splash_inter"])
+        XCTAssertEqual(interstitialService.loadedSlotKeys, ["splash_inter"])
+    }
+
     private func makeNativeConfiguration(
         primaryPlacementID: String = "native_primary",
         fallbackPlacementID: String = "native_fallback",
@@ -302,6 +341,27 @@ final class AdsKitManagerTests: XCTestCase {
         )
     }
 
+    private func makeSplashConfiguration(
+        autoReloadAfterDismiss: Bool = false
+    ) -> AdsConfiguration {
+        AdsConfiguration(
+            slots: [
+                AdsSlot(
+                    key: "splash_inter",
+                    format: .splashInterstitial,
+                    primaryPlacement: .init(id: "splash_primary", isEnabled: true)
+                )
+            ],
+            policies: .init(
+                splashInterstitial: .init(
+                    isEnabled: true,
+                    loadTimeoutSeconds: 20,
+                    autoReloadAfterDismiss: autoReloadAfterDismiss
+                )
+            )
+        )
+    }
+
     private func makeRuntimeContext(now: TimeInterval) -> AdsRuntimeContext {
         AdsRuntimeContext(
             isAdsEnabled: true,
@@ -318,5 +378,36 @@ private final class RecordingSink: AdsEventSink {
 
     func record(_ event: AdsEvent) {
         events.append(event)
+    }
+}
+
+@MainActor
+private final class SpyInterstitialAdService: InterstitialAdService {
+    private(set) var shownSplashSlotKeys: [String] = []
+    private(set) var loadedSlotKeys: [String] = []
+    private(set) var lastSplashAutoReload: (() -> Void)?
+
+    override func load(
+        slot: AdsSlot,
+        retryPolicy: AdsRetryPolicy,
+        runtimeContext: AdsRuntimeContext,
+        onLoaded: (() -> Void)? = nil
+    ) {
+        loadedSlotKeys.append(slot.key)
+        onLoaded?()
+    }
+
+    override func showSplash(
+        slot: AdsSlot,
+        splashPolicy: AdsSplashInterstitialPolicy,
+        retryPolicy: AdsRetryPolicy,
+        runtimeContext: AdsRuntimeContext,
+        onShown: (() -> Void)?,
+        onDismissed: (() -> Void)?,
+        onFailed: ((Error) -> Void)?,
+        autoReload: (() -> Void)?
+    ) {
+        shownSplashSlotKeys.append(slot.key)
+        lastSplashAutoReload = autoReload
     }
 }

@@ -4,7 +4,7 @@ import Foundation
 import UIKit
 
 @MainActor
-final class InterstitialAdService: NSObject, FullScreenContentDelegate {
+class InterstitialAdService: NSObject, FullScreenContentDelegate {
     @MainActor
     private final class SplashLoadState {
         var didFinish = false
@@ -131,7 +131,8 @@ final class InterstitialAdService: NSObject, FullScreenContentDelegate {
         runtimeContext: AdsRuntimeContext,
         onShown: (() -> Void)?,
         onDismissed: (() -> Void)?,
-        onFailed: ((Error) -> Void)?
+        onFailed: ((Error) -> Void)?,
+        autoReload: (() -> Void)?
     ) {
         guard let rootViewController = runtimeContext.topViewControllerProvider() else {
             onFailed?(AdsKitError.missingRootViewController)
@@ -150,7 +151,7 @@ final class InterstitialAdService: NSObject, FullScreenContentDelegate {
             self.onShown = onShown
             self.onDismissed = onDismissed
             self.onFailed = onFailed
-            autoReload = nil
+            self.autoReload = autoReload
             cachedAd.ad.present(from: rootViewController)
             return
         }
@@ -181,7 +182,7 @@ final class InterstitialAdService: NSObject, FullScreenContentDelegate {
             self.onShown = onShown
             self.onDismissed = onDismissed
             self.onFailed = onFailed
-            autoReload = nil
+            self.autoReload = autoReload
 
             appendPendingLoadCallback({ [weak self] in
                 guard let self, !state.didFinish else { return }
@@ -203,7 +204,7 @@ final class InterstitialAdService: NSObject, FullScreenContentDelegate {
         self.onShown = onShown
         self.onDismissed = onDismissed
         self.onFailed = onFailed
-        autoReload = nil
+        self.autoReload = autoReload
 
         startLoading(slot: slot, format: .splashInterstitial)
         loadSplash(
@@ -477,6 +478,7 @@ final class InterstitialAdService: NSObject, FullScreenContentDelegate {
         )
         if activeFormat == .splashInterstitial {
             removeCachedAd(slotKey: activeSlotKey, format: .splashInterstitial)
+            autoReload?()
         } else {
             removeCachedAd(slotKey: activeSlotKey, format: .interstitial)
             autoReload?()
