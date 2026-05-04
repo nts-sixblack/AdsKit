@@ -44,12 +44,29 @@ public struct AdsInterstitialPolicy: Codable, Sendable, Hashable {
 public struct AdsSplashInterstitialPolicy: Codable, Sendable, Hashable {
     public var isEnabled: Bool
     public var loadTimeoutSeconds: Int
+    public var autoReloadAfterDismiss: Bool
 
     public init(
         isEnabled: Bool = true,
-        loadTimeoutSeconds: Int = 20
+        loadTimeoutSeconds: Int = 20,
+        autoReloadAfterDismiss: Bool = false
     ) {
         self.isEnabled = isEnabled
+        self.loadTimeoutSeconds = max(1, loadTimeoutSeconds)
+        self.autoReloadAfterDismiss = autoReloadAfterDismiss
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case isEnabled
+        case loadTimeoutSeconds
+        case autoReloadAfterDismiss
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
+        let loadTimeoutSeconds = try container.decodeIfPresent(Int.self, forKey: .loadTimeoutSeconds) ?? 20
+        autoReloadAfterDismiss = try container.decodeIfPresent(Bool.self, forKey: .autoReloadAfterDismiss) ?? false
         self.loadTimeoutSeconds = max(1, loadTimeoutSeconds)
     }
 }

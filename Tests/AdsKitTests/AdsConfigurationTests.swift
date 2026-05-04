@@ -40,6 +40,11 @@ final class AdsConfigurationTests: XCTestCase {
                     minimumIntervalForAnyFullscreenSeconds: 15,
                     displayThreshold: 5,
                     autoReloadAfterDismiss: false
+                ),
+                splashInterstitial: .init(
+                    isEnabled: false,
+                    loadTimeoutSeconds: 9,
+                    autoReloadAfterDismiss: true
                 )
             ),
             preload: .init(
@@ -74,5 +79,22 @@ final class AdsConfigurationTests: XCTestCase {
         XCTAssertEqual(decoded.interstitialKeys, ["share_inter"])
         XCTAssertEqual(decoded.nativeKeys, ["language_native"])
         XCTAssertEqual(decoded.manual, .init())
+    }
+
+    func testSplashInterstitialPolicyDecodesLegacyPayloadWithoutAutoReloadFlag() throws {
+        let data = Data(
+            #"{"isEnabled":false,"loadTimeoutSeconds":7}"#.utf8
+        )
+
+        let decoded = try JSONDecoder().decode(AdsSplashInterstitialPolicy.self, from: data)
+
+        XCTAssertEqual(
+            decoded,
+            .init(
+                isEnabled: false,
+                loadTimeoutSeconds: 7,
+                autoReloadAfterDismiss: false
+            )
+        )
     }
 }

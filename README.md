@@ -182,6 +182,8 @@ Calling `apply(configuration:)` with the same configuration, or updating runtime
 
 Fullscreen services keep separate cached ads and in-flight loads per `slotKey`, so an ad loaded for one logical slot is not presented or attributed as another slot. Splash interstitial presentation also consumes a matching preloaded splash cache before starting an on-demand request.
 
+Set `configuration.policies.splashInterstitial.autoReloadAfterDismiss` to `true` when a splash slot should automatically request its next ad only after the current splash has fully dismissed.
+
 ## SwiftInjected
 
 `AdsKit` includes a `Dependency.adsKitManager(...)` helper for `SwiftInjected`. Files that use `Dependencies`, `@Injected`, or `@InjectedObservable` should import both `AdsKit` and `SwiftInjected`.

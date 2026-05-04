@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.9
+
+- Added `AdsSplashInterstitialPolicy.autoReloadAfterDismiss` to control whether a splash interstitial should request its next ad after dismissal.
+- Wired splash interstitial dismissal to optionally trigger a same-slot reload when that policy flag is enabled.
+- Preserved backward-compatible decoding for splash interstitial policy payloads that do not yet include the new reload flag.
+- Added coverage for splash interstitial policy decoding and manager reload callback wiring.
+
 ## 1.0.8
 
 - Scoped interstitial, splash interstitial, rewarded, and app-open caches and in-flight load guards by `slotKey`, preventing one logical slot from reusing or presenting another slot's cached fullscreen ad.
