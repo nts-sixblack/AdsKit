@@ -52,24 +52,25 @@ let configuration = AdsConfiguration(
         AdsSlot(
             key: "splash_inter",
             format: .splashInterstitial,
-            primaryPlacement: .init(id: "ca-app-pub-3940256099942544/1033173712", isEnabled: true)
+            primaryPlacement: .init(id: "your_splash_interstitial_ad_unit_id", isEnabled: true)
         ),
         AdsSlot(
             key: "language_native",
             format: .native,
-            primaryPlacement: .init(id: "ca-app-pub-3940256099942544/2247696110", isEnabled: true),
-            fallbackPlacement: .init(id: "ca-app-pub-3940256099942544/2247696110", isEnabled: true)
+            primaryPlacement: .init(id: "your_native_ad_unit_id", isEnabled: true),
+            fallbackPlacement: .init(id: "your_native_fallback_ad_unit_id", isEnabled: true)
         ),
         AdsSlot(
             key: "home_banner",
             format: .banner,
-            primaryPlacement: .init(id: "ca-app-pub-3940256099942544/2934735716", isEnabled: true)
+            primaryPlacement: .init(id: "your_banner_ad_unit_id", isEnabled: true)
         )
     ],
     preload: .init(
         interstitialKeys: ["splash_inter"],
         manual: .init(nativeKeys: ["language_native"])
-    )
+    ),
+    debug: .init(usesTestAdUnitIDs: true)
 )
 
 let adsManager = AdsKitManager(
@@ -232,4 +233,4 @@ struct HomeView: View {
 
 ## Example app
 
-An iOS sample app is included at `Example/AdsExample`. It uses Google test ad-unit IDs and demonstrates banner, native, interstitial, rewarded, and app open flows with the package directly.
+An iOS sample app is included at `Example/AdsExample`. It enables `debug.usesTestAdUnitIDs` and demonstrates banner, native, interstitial, rewarded, and app open flows with the package directly.

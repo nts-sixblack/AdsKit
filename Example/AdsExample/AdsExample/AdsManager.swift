@@ -6,7 +6,7 @@
 import AdsKit
 import SwiftInjected
 
-/// Builds and registers a shared `AdsKitManager` using Google test ad-unit IDs.
+/// Builds and registers a shared `AdsKitManager` with test ad-unit IDs enabled.
 @MainActor
 func setupDependencies() {
   let dependencies = Dependencies {
@@ -37,37 +37,37 @@ private func makeAdsConfiguration() -> AdsConfiguration {
       AdsSlot(
         key: "home_banner",
         format: .banner,
-        primaryPlacement: .init(id: "ca-app-pub-3940256099942544/2934735716", isEnabled: true)
+        primaryPlacement: .init(id: "example_home_banner", isEnabled: true)
       ),
       // Splash Interstitial
       AdsSlot(
         key: "splash_inter",
         format: .splashInterstitial,
-        primaryPlacement: .init(id: "ca-app-pub-3940256099942544/1033173712", isEnabled: true)
+        primaryPlacement: .init(id: "example_splash_interstitial", isEnabled: true)
       ),
       // Interstitial
       AdsSlot(
         key: "demo_inter",
         format: .interstitial,
-        primaryPlacement: .init(id: "ca-app-pub-3940256099942544/1033173712", isEnabled: true)
+        primaryPlacement: .init(id: "example_interstitial", isEnabled: true)
       ),
       // Rewarded
       AdsSlot(
         key: "demo_rewarded",
         format: .rewarded,
-        primaryPlacement: .init(id: "ca-app-pub-3940256099942544/1712485313", isEnabled: true)
+        primaryPlacement: .init(id: "example_rewarded", isEnabled: true)
       ),
       // App Open
       AdsSlot(
         key: "demo_app_open",
         format: .appOpen,
-        primaryPlacement: .init(id: "ca-app-pub-3940256099942544/5575463023", isEnabled: true)
+        primaryPlacement: .init(id: "example_app_open", isEnabled: true)
       ),
       // Native
       AdsSlot(
         key: "demo_native",
         format: .native,
-        primaryPlacement: .init(id: "ca-app-pub-3940256099942544/2247696110", isEnabled: true)
+        primaryPlacement: .init(id: "example_native", isEnabled: true)
       ),
     ],
     policies: .init(
@@ -100,6 +100,10 @@ private func makeAdsConfiguration() -> AdsConfiguration {
         trailingInset: 10
       )
     ),
-    debug: .init(isVerboseLoggingEnabled: true, logSkippedShows: true)
+    debug: .init(
+      isVerboseLoggingEnabled: true,
+      logSkippedShows: true,
+      usesTestAdUnitIDs: true
+    )
   )
 }

@@ -10,6 +10,7 @@ import AdsKit
 struct RemoteAdsPayload {
     let adsEnabled: Bool
     let premiumUser: Bool
+    let usesTestAdUnitIDs: Bool
     let splashInterstitialId: String
     let splashInterstitialEnabled: Bool
     let languageNativeId: String
@@ -39,7 +40,8 @@ func makeConfiguration(from payload: RemoteAdsPayload) -> AdsConfiguration {
         preload: .init(
             interstitialKeys: ["splash_inter"],
             manual: .init(nativeKeys: ["language_native"])
-        )
+        ),
+        debug: .init(usesTestAdUnitIDs: payload.usesTestAdUnitIDs)
     )
 }
 ```
@@ -50,6 +52,7 @@ func makeConfiguration(from payload: RemoteAdsPayload) -> AdsConfiguration {
 let payload = RemoteAdsPayload(
     adsEnabled: remoteValue("ads_enabled"),
     premiumUser: currentPremiumState,
+    usesTestAdUnitIDs: isDebugOrQABuild,
     splashInterstitialId: remoteString("tcg_scanner_inter_splash"),
     splashInterstitialEnabled: remoteBool("tcg_scanner_inter_splash_enabled"),
     languageNativeId: remoteString("tcg_scanner_native_language"),
@@ -68,5 +71,7 @@ func openLanguageScreen() {
 ```
 
 Repeated `apply(configuration:)` calls with an unchanged configuration are ignored. Runtime flag updates are also ignored when the value is already current, which keeps analytics sinks from receiving duplicate `configuration_applied` or `runtime_updated` events during remote config refreshes.
+
+Keep production placement IDs in remote config. For development and QA builds, use `AdsDebugOptions.usesTestAdUnitIDs` to replace eligible request IDs with Google's official AdMob iOS demo IDs while preserving slot enablement and runtime display gates.
 
 The same approach works with Firebase Remote Config, LaunchDarkly, local JSON, or your own API.

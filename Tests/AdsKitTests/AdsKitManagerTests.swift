@@ -1,5 +1,6 @@
 import Foundation
 import XCTest
+import UIKit
 @testable import AdsKit
 
 @MainActor
@@ -262,6 +263,135 @@ final class AdsKitManagerTests: XCTestCase {
 
         XCTAssertEqual(interstitialService.shownSplashSlotKeys, ["splash_inter"])
         XCTAssertEqual(interstitialService.loadedSlotKeys, ["splash_inter"])
+        XCTAssertEqual(interstitialService.loadedFormats, [.interstitial])
+    }
+
+    func testEffectiveSlotsUseGoogleTestAdUnitIDsWhenEnabled() {
+        let manager = AdsKitManager(
+            configuration: makeAllFormatsConfiguration(usesTestAdUnitIDs: true),
+            runtimeContext: makeRuntimeContext(now: 80)
+        )
+
+        let expectedIDs: [String: String] = [
+            "banner": AdsTestAdUnitIDs.adaptiveBanner,
+            "interstitial": AdsTestAdUnitIDs.interstitial,
+            "splash": AdsTestAdUnitIDs.splashInterstitial,
+            "rewarded": AdsTestAdUnitIDs.rewarded,
+            "app_open": AdsTestAdUnitIDs.appOpen,
+            "native": AdsTestAdUnitIDs.native
+        ]
+
+        for (slotKey, expectedID) in expectedIDs {
+            let effectiveSlot = manager.effectiveSlot(
+                forKey: slotKey,
+                expectedFormats: AdsFormat.allCases
+            )
+
+            XCTAssertEqual(effectiveSlot?.primaryPlacement.id, expectedID)
+            XCTAssertNil(effectiveSlot?.fallbackPlacement)
+        }
+    }
+
+    func testEffectiveSlotsKeepConfiguredIDsWhenTestModeIsDisabled() {
+        let manager = AdsKitManager(
+            configuration: makeAllFormatsConfiguration(usesTestAdUnitIDs: false),
+            runtimeContext: makeRuntimeContext(now: 90)
+        )
+
+        let effectiveSlot = manager.effectiveSlot(
+            forKey: "interstitial",
+            expectedFormats: AdsFormat.allCases
+        )
+
+        XCTAssertEqual(effectiveSlot?.primaryPlacement.id, "interstitial_primary")
+        XCTAssertEqual(effectiveSlot?.fallbackPlacement?.id, "interstitial_fallback")
+    }
+
+    func testDisabledSlotsRemainDisabledInTestAdUnitIDMode() {
+        let manager = AdsKitManager(
+            configuration: AdsConfiguration(
+                slots: [
+                    AdsSlot(
+                        key: "disabled_banner",
+                        format: .banner,
+                        primaryPlacement: .init(id: "banner_primary", isEnabled: false)
+                    )
+                ],
+                debug: .init(usesTestAdUnitIDs: true)
+            ),
+            runtimeContext: makeRuntimeContext(now: 100)
+        )
+
+        let effectiveSlot = manager.effectiveSlot(
+            forKey: "disabled_banner",
+            expectedFormats: [.banner]
+        )
+
+        XCTAssertFalse(manager.canDisplay(slotKey: "disabled_banner"))
+        XCTAssertEqual(effectiveSlot?.primaryPlacement.id, "banner_primary")
+        XCTAssertFalse(effectiveSlot?.primaryPlacement.isEnabled ?? true)
+    }
+
+    func testPreloadUsesTestAdUnitIDsWithoutConfiguredFallbacks() {
+        let sink = RecordingSink()
+        let manager = AdsKitManager(
+            configuration: makeAllFormatsConfiguration(usesTestAdUnitIDs: true),
+            runtimeContext: makeRuntimeContext(now: 110),
+            eventSink: sink
+        )
+
+        manager.preloadConfiguredSlots()
+
+        let requestedIDsBySlot = Dictionary(
+            uniqueKeysWithValues: sink.events
+                .filter { $0.kind == .loadRequested }
+                .compactMap { event in
+                    event.slotKey.map { ($0, event.adUnitId) }
+                }
+        )
+
+        XCTAssertEqual(requestedIDsBySlot["interstitial"], AdsTestAdUnitIDs.interstitial)
+        XCTAssertEqual(requestedIDsBySlot["rewarded"], AdsTestAdUnitIDs.rewarded)
+        XCTAssertEqual(requestedIDsBySlot["app_open"], AdsTestAdUnitIDs.appOpen)
+        XCTAssertEqual(requestedIDsBySlot["native"], AdsTestAdUnitIDs.native)
+        XCTAssertFalse(requestedIDsBySlot.values.contains("interstitial_fallback"))
+        XCTAssertFalse(requestedIDsBySlot.values.contains("rewarded_fallback"))
+        XCTAssertFalse(requestedIDsBySlot.values.contains("app_open_fallback"))
+        XCTAssertFalse(requestedIDsBySlot.values.contains("native_fallback"))
+    }
+
+    func testShowInterstitialOnSplashSlotUsesNormalInterstitialPath() {
+        let sink = RecordingSink()
+        let reporter = AdsEventReporter(sink: sink, debugOptions: .init())
+        let service = InterstitialAdService(reporter: reporter)
+        let slot = AdsSlot(
+            key: "splash_inter",
+            format: .splashInterstitial,
+            primaryPlacement: .init(id: "splash_primary", isEnabled: true)
+        )
+
+        service.showLoaded(
+            slot: slot,
+            retryPolicy: .init(maxAttempts: 1),
+            runtimeContext: AdsRuntimeContext(
+                isAdsEnabled: true,
+                isPremiumUser: false,
+                isFirstAppOpen: false,
+                topViewControllerProvider: { UIViewController() },
+                nowProvider: { Date(timeIntervalSince1970: 120) }
+            ),
+            onShown: nil,
+            onDismissed: nil,
+            onFailed: nil,
+            autoReload: nil
+        )
+
+        XCTAssertEqual(sink.events.first?.kind, .skipped)
+        XCTAssertEqual(sink.events.first?.format, .interstitial)
+        XCTAssertEqual(
+            sink.events.first(where: { $0.kind == .loadRequested })?.format,
+            .interstitial
+        )
     }
 
     private func makeNativeConfiguration(
@@ -362,6 +492,58 @@ final class AdsKitManagerTests: XCTestCase {
         )
     }
 
+    private func makeAllFormatsConfiguration(
+        usesTestAdUnitIDs: Bool
+    ) -> AdsConfiguration {
+        AdsConfiguration(
+            slots: [
+                AdsSlot(
+                    key: "banner",
+                    format: .banner,
+                    primaryPlacement: .init(id: "banner_primary", isEnabled: true),
+                    fallbackPlacement: .init(id: "banner_fallback", isEnabled: true)
+                ),
+                AdsSlot(
+                    key: "interstitial",
+                    format: .interstitial,
+                    primaryPlacement: .init(id: "interstitial_primary", isEnabled: true),
+                    fallbackPlacement: .init(id: "interstitial_fallback", isEnabled: true)
+                ),
+                AdsSlot(
+                    key: "splash",
+                    format: .splashInterstitial,
+                    primaryPlacement: .init(id: "splash_primary", isEnabled: true),
+                    fallbackPlacement: .init(id: "splash_fallback", isEnabled: true)
+                ),
+                AdsSlot(
+                    key: "rewarded",
+                    format: .rewarded,
+                    primaryPlacement: .init(id: "rewarded_primary", isEnabled: true),
+                    fallbackPlacement: .init(id: "rewarded_fallback", isEnabled: true)
+                ),
+                AdsSlot(
+                    key: "app_open",
+                    format: .appOpen,
+                    primaryPlacement: .init(id: "app_open_primary", isEnabled: true),
+                    fallbackPlacement: .init(id: "app_open_fallback", isEnabled: true)
+                ),
+                AdsSlot(
+                    key: "native",
+                    format: .native,
+                    primaryPlacement: .init(id: "native_primary", isEnabled: true),
+                    fallbackPlacement: .init(id: "native_fallback", isEnabled: true)
+                )
+            ],
+            preload: .init(
+                interstitialKeys: ["interstitial"],
+                rewardedKeys: ["rewarded"],
+                appOpenKeys: ["app_open"],
+                nativeKeys: ["native"]
+            ),
+            debug: .init(usesTestAdUnitIDs: usesTestAdUnitIDs)
+        )
+    }
+
     private func makeRuntimeContext(now: TimeInterval) -> AdsRuntimeContext {
         AdsRuntimeContext(
             isAdsEnabled: true,
@@ -385,15 +567,18 @@ private final class RecordingSink: AdsEventSink {
 private final class SpyInterstitialAdService: InterstitialAdService {
     private(set) var shownSplashSlotKeys: [String] = []
     private(set) var loadedSlotKeys: [String] = []
+    private(set) var loadedFormats: [AdsFormat] = []
     private(set) var lastSplashAutoReload: (() -> Void)?
 
     override func load(
         slot: AdsSlot,
+        format: AdsFormat = .interstitial,
         retryPolicy: AdsRetryPolicy,
         runtimeContext: AdsRuntimeContext,
         onLoaded: (() -> Void)? = nil
     ) {
         loadedSlotKeys.append(slot.key)
+        loadedFormats.append(format)
         onLoaded?()
     }
 

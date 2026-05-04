@@ -69,7 +69,7 @@ You can still preload one native slot directly with `AdsKitManager.preloadNative
 
 Fullscreen preloads are cached per slot key and validated against the slot's current enabled placements before being reused. A cached interstitial, rewarded, app-open, or splash interstitial ad for one slot key is not presented for another slot key.
 
-When `policies.splashInterstitial.autoReloadAfterDismiss` is `true`, AdsKit requests the next splash interstitial only after the current splash ad has finished dismissing.
+When `policies.splashInterstitial.autoReloadAfterDismiss` is `true`, AdsKit requests the next normal interstitial for the same slot key only after the current splash ad has finished dismissing.
 
 Native preloads are also scoped by slot key. `refreshNative(slotKey:)` does not request a new native ad while that slot's view model already has an ad; use `refreshNative(slotKey:force: true)` when you intentionally want to replace it. `preloadNative(slotKey:)` only records `preload_created` when a new native request actually starts.
 
@@ -146,6 +146,9 @@ theme: .init(
 
 - `isVerboseLoggingEnabled`
 - `logSkippedShows`
+- `usesTestAdUnitIDs`: when `true`, eligible ad requests keep the configured slot key and gating behavior, but replace the request ad-unit ID with Google's official AdMob iOS demo ID for that format. Fallback placements are skipped for that request. Disabled slots stay disabled.
+
+Use `usesTestAdUnitIDs` for development builds instead of putting demo IDs directly into placement configuration. The public `AdsTestAdUnitIDs` constants expose Google's iOS demo IDs for banner, adaptive banner, interstitial, splash interstitial, rewarded, app open, native, and native video formats.
 
 ## Events
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.10
+
+- Added `AdsDebugOptions.usesTestAdUnitIDs` so development builds can request Google's official AdMob iOS demo unit IDs without hardcoding them into placement config.
+- Added public `AdsTestAdUnitIDs` constants for banner, adaptive banner, interstitial, splash interstitial, rewarded, app-open, native, and native-video test IDs.
+- Routed eligible banner, interstitial, splash interstitial, rewarded, app-open, and native requests through effective test slots while preserving display gates, slot enablement, and production fallback behavior when test mode is off.
+- Fixed splash interstitial auto-reload so dismissing a splash ad prepares the same slot key in the normal `.interstitial` cache.
+- Made `showInterstitial` on a splash slot use the normal interstitial cache path instead of the splash cache.
+- Updated docs and the example app to prefer `usesTestAdUnitIDs` over configuring demo IDs as placement IDs.
+
 ## 1.0.9
 
 - Added `AdsSplashInterstitialPolicy.autoReloadAfterDismiss` to control whether a splash interstitial should request its next ad after dismissal.

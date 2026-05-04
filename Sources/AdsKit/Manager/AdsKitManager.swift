@@ -74,12 +74,13 @@ public final class AdsKitManager: NSObject, ObservableObject {
 
         let oldNativePolicy = oldConfiguration.policies.native
         let newNativePolicy = configuration.policies.native
+        let didChangeEffectiveSlots = oldConfiguration.debug.usesTestAdUnitIDs != configuration.debug.usesTestAdUnitIDs
 
         let keys = Array(nativeViewModels.keys)
         for key in keys {
             let oldSlot = oldConfiguration.slot(forKey: key)
             let newSlot = configuration.slot(forKey: key)
-            if oldSlot != newSlot || oldNativePolicy != newNativePolicy {
+            if didChangeEffectiveSlots || oldSlot != newSlot || oldNativePolicy != newNativePolicy {
                 nativeViewModels.removeValue(forKey: key)
             }
         }
@@ -160,21 +161,21 @@ public final class AdsKitManager: NSObject, ObservableObject {
         ) else {
             return false
         }
-        return interstitialAdService.hasCachedAd(for: slot)
+        return interstitialAdService.hasCachedAd(for: effectiveSlot(for: slot))
     }
 
     public func hasLoadedRewarded(slotKey: String) -> Bool {
         guard let slot = resolveSlot(forKey: slotKey, expectedFormats: [.rewarded]) else {
             return false
         }
-        return rewardedAdService.hasCachedAd(for: slot)
+        return rewardedAdService.hasCachedAd(for: effectiveSlot(for: slot))
     }
 
     public func hasLoadedAppOpen(slotKey: String) -> Bool {
         guard let slot = resolveSlot(forKey: slotKey, expectedFormats: [.appOpen]) else {
             return false
         }
-        return appOpenAdService.hasCachedAd(for: slot)
+        return appOpenAdService.hasCachedAd(for: effectiveSlot(for: slot))
     }
 
     public func hasLoadedNative(slotKey: String) -> Bool {
@@ -196,7 +197,7 @@ public final class AdsKitManager: NSObject, ObservableObject {
             return
         }
         interstitialAdService.load(
-            slot: slot,
+            slot: effectiveSlot(for: slot),
             retryPolicy: configuration.policies.retry,
             runtimeContext: runtimeContext,
             onLoaded: onLoaded
@@ -244,8 +245,9 @@ public final class AdsKitManager: NSObject, ObservableObject {
         }
 
         isShowingFullscreenAd = true
+        let requestSlot = effectiveSlot(for: slot)
         interstitialAdService.showLoaded(
-            slot: slot,
+            slot: requestSlot,
             retryPolicy: configuration.policies.retry,
             runtimeContext: runtimeContext,
             onShown: { [weak self] in
@@ -299,8 +301,9 @@ public final class AdsKitManager: NSObject, ObservableObject {
         }
 
         isShowingFullscreenAd = true
+        let requestSlot = effectiveSlot(for: slot)
         interstitialAdService.showSplash(
-            slot: slot,
+            slot: requestSlot,
             splashPolicy: configuration.policies.splashInterstitial,
             retryPolicy: configuration.policies.retry,
             runtimeContext: runtimeContext,
@@ -336,7 +339,7 @@ public final class AdsKitManager: NSObject, ObservableObject {
         }
         guard canDisplay(slot: slot) else { return }
         rewardedAdService.load(
-            slot: slot,
+            slot: effectiveSlot(for: slot),
             runtimeContext: runtimeContext,
             onLoaded: onLoaded
         )
@@ -357,8 +360,9 @@ public final class AdsKitManager: NSObject, ObservableObject {
         }
 
         isShowingFullscreenAd = true
+        let requestSlot = effectiveSlot(for: slot)
         rewardedAdService.show(
-            slot: slot,
+            slot: requestSlot,
             runtimeContext: runtimeContext,
             onShown: { [weak self] in
                 guard let self else { return }
@@ -394,7 +398,7 @@ public final class AdsKitManager: NSObject, ObservableObject {
         }
         guard canDisplay(slot: slot) else { return }
         appOpenAdService.load(
-            slot: slot,
+            slot: effectiveSlot(for: slot),
             runtimeContext: runtimeContext,
             onLoaded: onLoaded
         )
@@ -426,8 +430,9 @@ public final class AdsKitManager: NSObject, ObservableObject {
         }
 
         isShowingFullscreenAd = true
+        let requestSlot = effectiveSlot(for: slot)
         appOpenAdService.show(
-            slot: slot,
+            slot: requestSlot,
             runtimeContext: runtimeContext,
             policy: configuration.policies.appOpen,
             onShown: { [weak self] in
@@ -479,8 +484,9 @@ public final class AdsKitManager: NSObject, ObservableObject {
             return nil
         }
 
+        let requestSlot = effectiveSlot(for: slot)
         let viewModel = NativeAdViewModel(
-            slot: slot,
+            slot: requestSlot,
             policy: configuration.policies.native,
             runtimeProvider: { [weak self] in
                 self?.runtimeContext ?? .init()
@@ -615,5 +621,33 @@ public final class AdsKitManager: NSObject, ObservableObject {
             return nil
         }
         return slot
+    }
+
+    func effectiveSlot(forKey key: String, expectedFormats: [AdsFormat]) -> AdsSlot? {
+        guard let slot = resolveSlot(forKey: key, expectedFormats: expectedFormats) else {
+            return nil
+        }
+        return effectiveSlot(for: slot)
+    }
+
+    func effectiveSlot(for slot: AdsSlot) -> AdsSlot {
+        guard configuration.debug.usesTestAdUnitIDs else {
+            return slot
+        }
+        guard AdsPlacementResolver.preferredPlacement(for: slot) != nil else {
+            return slot
+        }
+
+        return AdsSlot(
+            key: slot.key,
+            format: slot.format,
+            primaryPlacement: AdsPlacement(
+                id: AdsTestAdUnitIDs.adUnitID(for: slot.format),
+                isEnabled: true
+            ),
+            fallbackPlacement: nil,
+            adChoicesPosition: slot.adChoicesPosition,
+            requestIntervalSeconds: slot.requestIntervalSeconds
+        )
     }
 }

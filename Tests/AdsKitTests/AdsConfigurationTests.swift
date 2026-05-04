@@ -97,4 +97,16 @@ final class AdsConfigurationTests: XCTestCase {
             )
         )
     }
+
+    func testDebugOptionsDecodesLegacyPayloadWithoutTestAdUnitIDFlag() throws {
+        let data = Data(
+            #"{"isVerboseLoggingEnabled":true,"logSkippedShows":false}"#.utf8
+        )
+
+        let decoded = try JSONDecoder().decode(AdsDebugOptions.self, from: data)
+
+        XCTAssertTrue(decoded.isVerboseLoggingEnabled)
+        XCTAssertFalse(decoded.logSkippedShows)
+        XCTAssertFalse(decoded.usesTestAdUnitIDs)
+    }
 }

@@ -41,17 +41,17 @@ class InterstitialAdService: NSObject, FullScreenContentDelegate {
         self.reporter = reporter
     }
 
-    func hasCachedAd(for slot: AdsSlot) -> Bool {
-        cachedAd(for: slot, format: cacheFormat(for: slot)) != nil
+    func hasCachedAd(for slot: AdsSlot, format: AdsFormat = .interstitial) -> Bool {
+        cachedAd(for: slot, format: format) != nil
     }
 
     func load(
         slot: AdsSlot,
+        format: AdsFormat = .interstitial,
         retryPolicy: AdsRetryPolicy,
         runtimeContext: AdsRuntimeContext,
         onLoaded: (() -> Void)? = nil
     ) {
-        let format = cacheFormat(for: slot)
         guard cachedAd(for: slot, format: format) == nil else {
             onLoaded?()
             return
@@ -93,7 +93,7 @@ class InterstitialAdService: NSObject, FullScreenContentDelegate {
             return
         }
 
-        let format = cacheFormat(for: slot)
+        let format = AdsFormat.interstitial
         guard let cachedAd = cachedAd(for: slot, format: format) else {
             reporter.record(
                 AdsEvent(
@@ -107,6 +107,7 @@ class InterstitialAdService: NSObject, FullScreenContentDelegate {
             )
             load(
                 slot: slot,
+                format: format,
                 retryPolicy: retryPolicy,
                 runtimeContext: runtimeContext
             )
@@ -337,6 +338,7 @@ class InterstitialAdService: NSObject, FullScreenContentDelegate {
             guard let self else { return }
             self.load(
                 slot: slot,
+                format: format,
                 retryPolicy: retryPolicy,
                 runtimeContext: runtimeContext
             )
@@ -561,10 +563,6 @@ class InterstitialAdService: NSObject, FullScreenContentDelegate {
         onDismissed = nil
         onFailed = nil
         autoReload = nil
-    }
-
-    private func cacheFormat(for slot: AdsSlot) -> AdsFormat {
-        slot.format == .splashInterstitial ? .splashInterstitial : .interstitial
     }
 
     private func cachedAd(for slot: AdsSlot, format: AdsFormat) -> CachedInterstitialAd? {

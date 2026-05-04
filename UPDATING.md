@@ -1,5 +1,15 @@
 # Updating AdsKit
 
+## From 1.0.9 to 1.0.10
+
+- No migration is required for existing production placement configuration.
+- `AdsDebugOptions` now includes `usesTestAdUnitIDs`, defaulting to `false`.
+- Set `debug: .init(usesTestAdUnitIDs: true)` in development or QA builds when every eligible request should use Google's official AdMob iOS demo unit ID for its format.
+- Keep real placement IDs in `AdsSlot` config. Test mode replaces the request ad-unit ID at load time and skips configured fallback placement for that request.
+- Disabled slots remain disabled in test mode, and runtime gates such as ads-enabled, premium status, first-app-open rules, and frequency policies still apply.
+- If your host app previously hardcoded Google demo IDs into placement config, move those slots back to real placement IDs and use `usesTestAdUnitIDs` as the testing switch.
+- Splash interstitial auto-reload now prepares the next normal interstitial for the same slot key after dismissal.
+
 ## From 1.0.8 to 1.0.9
 
 - No migration is required for existing splash interstitial call sites.

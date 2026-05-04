@@ -37,7 +37,7 @@ public struct BannerAdsView: View {
         ZStack {
             if canRenderBanner,
                let layout,
-               let slot = manager.slot(forKey: slotKey),
+               let slot = manager.effectiveSlot(forKey: slotKey, expectedFormats: [.banner]),
                let placement = AdsPlacementResolver.preferredPlacement(for: slot) {
                 BannerAdsRepresentable(
                     slotKey: slot.key,
