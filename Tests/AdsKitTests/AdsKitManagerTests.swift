@@ -175,6 +175,57 @@ final class AdsKitManagerTests: XCTestCase {
         XCTAssertFalse(manager.canDisplay(slotKey: "launch_app_open"))
     }
 
+    func testCanDisplayRespectsFormatEnablementFlags() {
+        let disabledBySlot: [(String, AdsFormatEnablement)] = [
+            ("banner", .init(banner: false)),
+            ("interstitial", .init(interstitial: false)),
+            ("splash", .init(splashInterstitial: false)),
+            ("rewarded", .init(rewarded: false)),
+            ("native", .init(native: false)),
+            ("app_open", .init(appOpen: false))
+        ]
+
+        for (slotKey, enablement) in disabledBySlot {
+            let manager = AdsKitManager(
+                configuration: makeAllFormatsConfiguration(
+                    enabled: enablement,
+                    usesTestAdUnitIDs: false
+                ),
+                runtimeContext: makeRuntimeContext(now: 35)
+            )
+
+            XCTAssertFalse(manager.canDisplay(slotKey: slotKey), "Expected \(slotKey) to be disabled")
+        }
+    }
+
+    func testDisabledFormatsDoNotPreloadOrCreateNativeViewModels() {
+        let sink = RecordingSink()
+        let manager = AdsKitManager(
+            configuration: makeAllFormatsConfiguration(
+                enabled: .init(
+                    banner: false,
+                    interstitial: false,
+                    splashInterstitial: false,
+                    rewarded: false,
+                    native: false,
+                    appOpen: false
+                ),
+                usesTestAdUnitIDs: true
+            ),
+            runtimeContext: makeRuntimeContext(now: 36),
+            eventSink: sink
+        )
+
+        manager.preloadConfiguredSlots()
+
+        XCTAssertTrue(sink.events.isEmpty)
+        XCTAssertNil(manager.nativeViewModel(for: "native"))
+        XCTAssertFalse(manager.hasLoadedInterstitial(slotKey: "interstitial"))
+        XCTAssertFalse(manager.hasLoadedRewarded(slotKey: "rewarded"))
+        XCTAssertFalse(manager.hasLoadedAppOpen(slotKey: "app_open"))
+        XCTAssertFalse(manager.hasLoadedNative(slotKey: "native"))
+    }
+
     func testPreloadConfiguredSlotsOnlyLoadsStartupBucket() {
         let sink = RecordingSink()
         let manager = AdsKitManager(
@@ -493,6 +544,7 @@ final class AdsKitManagerTests: XCTestCase {
     }
 
     private func makeAllFormatsConfiguration(
+        enabled: AdsFormatEnablement = .init(),
         usesTestAdUnitIDs: Bool
     ) -> AdsConfiguration {
         AdsConfiguration(
@@ -534,6 +586,7 @@ final class AdsKitManagerTests: XCTestCase {
                     fallbackPlacement: .init(id: "native_fallback", isEnabled: true)
                 )
             ],
+            enabled: enabled,
             preload: .init(
                 interstitialKeys: ["interstitial"],
                 rewardedKeys: ["rewarded"],

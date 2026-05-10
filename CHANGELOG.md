@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.12
+
+- Added `AdsFormatEnablement` and `AdsConfiguration.enabled` for app-wide enable/disable switches by ad format.
+- Disabled formats now skip display, load, preload, native view model creation, and cache-readiness checks for matching slots.
+- Preserved backward-compatible decoding for existing configuration payloads that do not include format enablement flags.
+- Updated docs and remote-config samples to distinguish format-level switches from placement-level ad-unit switches.
+
 ## 1.0.10
 
 - Added `AdsDebugOptions.usesTestAdUnitIDs` so development builds can request Google's official AdMob iOS demo unit IDs without hardcoding them into placement config.

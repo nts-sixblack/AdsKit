@@ -75,12 +75,13 @@ public final class AdsKitManager: NSObject, ObservableObject {
         let oldNativePolicy = oldConfiguration.policies.native
         let newNativePolicy = configuration.policies.native
         let didChangeEffectiveSlots = oldConfiguration.debug.usesTestAdUnitIDs != configuration.debug.usesTestAdUnitIDs
+        let didChangeFormatEnablement = oldConfiguration.enabled != configuration.enabled
 
         let keys = Array(nativeViewModels.keys)
         for key in keys {
             let oldSlot = oldConfiguration.slot(forKey: key)
             let newSlot = configuration.slot(forKey: key)
-            if didChangeEffectiveSlots || oldSlot != newSlot || oldNativePolicy != newNativePolicy {
+            if didChangeEffectiveSlots || didChangeFormatEnablement || oldSlot != newSlot || oldNativePolicy != newNativePolicy {
                 nativeViewModels.removeValue(forKey: key)
             }
         }
@@ -161,6 +162,7 @@ public final class AdsKitManager: NSObject, ObservableObject {
         ) else {
             return false
         }
+        guard canDisplay(slot: slot) else { return false }
         return interstitialAdService.hasCachedAd(for: effectiveSlot(for: slot))
     }
 
@@ -168,6 +170,7 @@ public final class AdsKitManager: NSObject, ObservableObject {
         guard let slot = resolveSlot(forKey: slotKey, expectedFormats: [.rewarded]) else {
             return false
         }
+        guard canDisplay(slot: slot) else { return false }
         return rewardedAdService.hasCachedAd(for: effectiveSlot(for: slot))
     }
 
@@ -175,11 +178,16 @@ public final class AdsKitManager: NSObject, ObservableObject {
         guard let slot = resolveSlot(forKey: slotKey, expectedFormats: [.appOpen]) else {
             return false
         }
+        guard canDisplay(slot: slot) else { return false }
         return appOpenAdService.hasCachedAd(for: effectiveSlot(for: slot))
     }
 
     public func hasLoadedNative(slotKey: String) -> Bool {
-        nativeViewModels[slotKey]?.hasLoadedAd ?? false
+        guard let slot = resolveSlot(forKey: slotKey, expectedFormats: [.native]) else {
+            return false
+        }
+        guard canDisplay(slot: slot) else { return false }
+        return nativeViewModels[slotKey]?.hasLoadedAd ?? false
     }
 
     public func loadInterstitial(
@@ -483,6 +491,10 @@ public final class AdsKitManager: NSObject, ObservableObject {
         guard let slot = resolveSlot(forKey: slotKey, expectedFormats: [.native]) else {
             return nil
         }
+        guard canDisplay(slot: slot) else {
+            nativeViewModels.removeValue(forKey: slotKey)
+            return nil
+        }
 
         let requestSlot = effectiveSlot(for: slot)
         let viewModel = NativeAdViewModel(
@@ -596,6 +608,7 @@ public final class AdsKitManager: NSObject, ObservableObject {
     private func canDisplay(slot: AdsSlot) -> Bool {
         guard runtimeContext.isAdsEnabled else { return false }
         guard !runtimeContext.isPremiumUser else { return false }
+        guard configuration.enabled.isEnabled(for: slot.format) else { return false }
         guard AdsPlacementResolver.preferredPlacement(for: slot) != nil else { return false }
         if slot.format == .appOpen {
             guard !runtimeContext.isFirstAppOpen else { return false }

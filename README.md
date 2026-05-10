@@ -66,6 +66,14 @@ let configuration = AdsConfiguration(
             primaryPlacement: .init(id: "your_banner_ad_unit_id", isEnabled: true)
         )
     ],
+    enabled: .init(
+        banner: true,
+        interstitial: true,
+        splashInterstitial: true,
+        rewarded: true,
+        native: true,
+        appOpen: true
+    ),
     preload: .init(
         interstitialKeys: ["splash_inter"],
         manual: .init(nativeKeys: ["language_native"])
@@ -180,6 +188,8 @@ final class AnalyticsSink: AdsEventSink {
 Failed load and presentation events include structured metadata when Google Mobile Ads exposes it. Common keys include `error_domain`, `error_code`, `underlying_error_domain`, `response_identifier`, `adapter_response_count`, `loaded_adapter_name`, and first-adapter error details.
 
 Calling `apply(configuration:)` with the same configuration, or updating runtime flags to their current values, is a no-op and does not emit duplicate analytics events.
+
+Use `configuration.enabled` to disable an entire format across the app. When a format flag is `false`, AdsKit skips preload, load, display, native view model creation, and cache-readiness checks for matching slots. Use `AdsPlacement.isEnabled` separately for primary/fallback ad-unit level switches.
 
 Fullscreen services keep separate cached ads and in-flight loads per `slotKey`, so an ad loaded for one logical slot is not presented or attributed as another slot. Splash interstitial presentation also consumes a matching preloaded splash cache before starting an on-demand request.
 

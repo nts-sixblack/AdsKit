@@ -4,6 +4,25 @@
 
 Applying the same configuration more than once is a no-op. Runtime updates also only emit `runtime_updated` when `isAdsEnabled`, `isPremiumUser`, or `isFirstAppOpen` actually changes.
 
+## Format Enablement
+
+`enabled` controls whether an entire ad format can load or display. All flags default to `true`.
+
+```swift
+AdsConfiguration(
+    enabled: .init(
+        banner: true,
+        interstitial: true,
+        splashInterstitial: true,
+        rewarded: true,
+        native: true,
+        appOpen: true
+    )
+)
+```
+
+When a format flag is `false`, AdsKit disables that format completely: preload, load, display, native view model creation, and cache-readiness checks all stop for matching slots. `AdsPlacement.isEnabled` still controls individual ad-unit placement fallback within an enabled format.
+
 ## Slots
 
 Each `AdsSlot` represents one logical placement key used by the host app.

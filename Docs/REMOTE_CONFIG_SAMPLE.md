@@ -11,6 +11,12 @@ struct RemoteAdsPayload {
     let adsEnabled: Bool
     let premiumUser: Bool
     let usesTestAdUnitIDs: Bool
+    let bannerEnabled: Bool
+    let interstitialEnabled: Bool
+    let splashInterstitialFormatEnabled: Bool
+    let rewardedEnabled: Bool
+    let nativeEnabled: Bool
+    let appOpenEnabled: Bool
     let splashInterstitialId: String
     let splashInterstitialEnabled: Bool
     let languageNativeId: String
@@ -37,6 +43,14 @@ func makeConfiguration(from payload: RemoteAdsPayload) -> AdsConfiguration {
                 )
             )
         ],
+        enabled: .init(
+            banner: payload.bannerEnabled,
+            interstitial: payload.interstitialEnabled,
+            splashInterstitial: payload.splashInterstitialFormatEnabled,
+            rewarded: payload.rewardedEnabled,
+            native: payload.nativeEnabled,
+            appOpen: payload.appOpenEnabled
+        ),
         preload: .init(
             interstitialKeys: ["splash_inter"],
             manual: .init(nativeKeys: ["language_native"])
@@ -53,6 +67,12 @@ let payload = RemoteAdsPayload(
     adsEnabled: remoteValue("ads_enabled"),
     premiumUser: currentPremiumState,
     usesTestAdUnitIDs: isDebugOrQABuild,
+    bannerEnabled: remoteBool("ads_banner_enabled"),
+    interstitialEnabled: remoteBool("ads_interstitial_enabled"),
+    splashInterstitialFormatEnabled: remoteBool("ads_splash_interstitial_enabled"),
+    rewardedEnabled: remoteBool("ads_rewarded_enabled"),
+    nativeEnabled: remoteBool("ads_native_enabled"),
+    appOpenEnabled: remoteBool("ads_app_open_enabled"),
     splashInterstitialId: remoteString("tcg_scanner_inter_splash"),
     splashInterstitialEnabled: remoteBool("tcg_scanner_inter_splash_enabled"),
     languageNativeId: remoteString("tcg_scanner_native_language"),
@@ -73,5 +93,7 @@ func openLanguageScreen() {
 Repeated `apply(configuration:)` calls with an unchanged configuration are ignored. Runtime flag updates are also ignored when the value is already current, which keeps analytics sinks from receiving duplicate `configuration_applied` or `runtime_updated` events during remote config refreshes.
 
 Keep production placement IDs in remote config. For development and QA builds, use `AdsDebugOptions.usesTestAdUnitIDs` to replace eligible request IDs with Google's official AdMob iOS demo IDs while preserving slot enablement and runtime display gates.
+
+Use `AdsConfiguration.enabled` for global per-format switches, and keep `AdsPlacement.isEnabled` for individual primary/fallback ad-unit switches.
 
 The same approach works with Firebase Remote Config, LaunchDarkly, local JSON, or your own API.

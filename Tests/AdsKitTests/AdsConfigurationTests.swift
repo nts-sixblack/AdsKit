@@ -34,6 +34,14 @@ final class AdsConfigurationTests: XCTestCase {
                     requestIntervalSeconds: 120
                 )
             ],
+            enabled: .init(
+                banner: false,
+                interstitial: true,
+                splashInterstitial: false,
+                rewarded: true,
+                native: false,
+                appOpen: true
+            ),
             policies: .init(
                 interstitial: .init(
                     minimumIntervalForSameSlotSeconds: 30,
@@ -67,6 +75,50 @@ final class AdsConfigurationTests: XCTestCase {
         let decoded = try JSONDecoder().decode(AdsConfiguration.self, from: data)
 
         XCTAssertEqual(decoded, configuration)
+    }
+
+    func testConfigurationDecodesLegacyPayloadWithoutFormatEnablement() throws {
+        let data = Data(
+            """
+            {
+              "slots": [
+                {
+                  "key": "home_banner",
+                  "format": "banner",
+                  "primaryPlacement": {
+                    "id": "banner_primary",
+                    "isEnabled": true
+                  }
+                }
+              ]
+            }
+            """.utf8
+        )
+
+        let decoded = try JSONDecoder().decode(AdsConfiguration.self, from: data)
+
+        XCTAssertEqual(decoded.enabled, .init())
+        XCTAssertTrue(decoded.enabled.isEnabled(for: .banner))
+        XCTAssertTrue(decoded.enabled.isEnabled(for: .interstitial))
+        XCTAssertTrue(decoded.enabled.isEnabled(for: .splashInterstitial))
+        XCTAssertTrue(decoded.enabled.isEnabled(for: .rewarded))
+        XCTAssertTrue(decoded.enabled.isEnabled(for: .native))
+        XCTAssertTrue(decoded.enabled.isEnabled(for: .appOpen))
+    }
+
+    func testFormatEnablementDecodesPartialPayloadWithEnabledDefaults() throws {
+        let data = Data(
+            #"{"banner":false,"appOpen":false}"#.utf8
+        )
+
+        let decoded = try JSONDecoder().decode(AdsFormatEnablement.self, from: data)
+
+        XCTAssertFalse(decoded.banner)
+        XCTAssertTrue(decoded.interstitial)
+        XCTAssertTrue(decoded.splashInterstitial)
+        XCTAssertTrue(decoded.rewarded)
+        XCTAssertTrue(decoded.native)
+        XCTAssertFalse(decoded.appOpen)
     }
 
     func testPreloadConfigurationDecodesLegacyPayloadWithoutManualBucket() throws {
