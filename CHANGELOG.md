@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.13
+
+- Fixed `NativeAdViewStyle.banner` so it no longer registers a `MediaView`, preventing Google Mobile Ads video warnings when compact native banner layouts are too small for video media.
+- Preserved media registration for native styles that visibly render media, including large, medium media, small media, icon media, overlay, video, and collapse layouts.
+- Updated docs to clarify that native banner style is a compact text/CTA layout and media-backed native creatives should use one of the media styles.
+
 ## 1.0.12
 
 - Added `AdsFormatEnablement` and `AdsConfiguration.enabled` for app-wide enable/disable switches by ad format.

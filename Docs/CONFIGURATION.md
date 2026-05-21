@@ -51,6 +51,12 @@ Fields:
 
 Pass `adSize:` when the host app needs a fixed, larger, or custom Google Mobile Ads banner size. The view collapses to height `0` until it has a valid width and after a failed banner load, so parent layouts do not keep an empty banner gap.
 
+## Native Layouts
+
+`NativeAdViewStyle.banner` is intended for compact native banner placements. It renders text and CTA content without registering a Google Mobile Ads `MediaView`, which avoids video media warnings in banner-sized layouts.
+
+Use `.mediumMedia`, `.smallMedia`, `.iconMedia`, `.overlay`, `.video`, `.large`, or `.collapse` when a native placement should display image or video media.
+
 ## Policies
 
 `AdsPolicies` groups runtime behavior:

@@ -1,5 +1,11 @@
 # Updating AdsKit
 
+## From 1.0.12 to 1.0.13
+
+- No API migration is required.
+- `NativeAdViewStyle.banner` no longer registers a Google Mobile Ads `MediaView`. This avoids `MediaView is too small for video` warnings in compact native banner placements.
+- If a native placement should render image or video media, use one of the media styles such as `.mediumMedia`, `.smallMedia`, `.iconMedia`, `.overlay`, `.video`, `.large`, or `.collapse` instead of `.banner`.
+
 ## From 1.0.9 to 1.0.10
 
 - No migration is required for existing production placement configuration.

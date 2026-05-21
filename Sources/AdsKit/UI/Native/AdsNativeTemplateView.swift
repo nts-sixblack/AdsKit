@@ -377,7 +377,7 @@ final class AdsNativeTemplateView: NativeAdView {
         callToActionButton.isHidden = nativeAd.callToAction == nil
         callToActionView = callToActionButton.isHidden ? nil : callToActionButton
 
-        mediaView = mediaAssetView
+        mediaView = style == .banner ? nil : mediaAssetView
 
         self.nativeAd = nativeAd
     }
