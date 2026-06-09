@@ -21,6 +21,8 @@ final class RewardedAdService: NSObject, FullScreenContentDelegate {
     private var activeSlotKey: String?
     private var onShown: (() -> Void)?
     private var onDismissed: (() -> Void)?
+    private var onReward: ((AdReward?) -> Void)?
+    private var pendingReward: AdReward?
 
     init(reporter: AdsEventReporter) {
         self.reporter = reporter
@@ -74,6 +76,7 @@ final class RewardedAdService: NSObject, FullScreenContentDelegate {
         if let cachedAd = cachedAd(for: slot) {
             self.onShown = onShown
             self.onDismissed = onDismissed
+            self.onReward = onReward
             activeSlotKey = slot.key
             cachedAd.ad.present(from: rootViewController) { [weak self] in
                 guard let self else { return }
@@ -90,7 +93,7 @@ final class RewardedAdService: NSObject, FullScreenContentDelegate {
                         ]
                     )
                 )
-                onReward(cachedAd.ad.adReward)
+                self.pendingReward = cachedAd.ad.adReward
             }
             return
         }
@@ -109,6 +112,7 @@ final class RewardedAdService: NSObject, FullScreenContentDelegate {
 
         self.onShown = onShown
         self.onDismissed = onDismissed
+        self.onReward = onReward
         activeSlotKey = slot.key
         startLoading(slot: slot)
         loadAndPresentRewarded(
@@ -116,8 +120,7 @@ final class RewardedAdService: NSObject, FullScreenContentDelegate {
             placements: placements,
             index: 0,
             rootViewController: rootViewController,
-            runtimeContext: runtimeContext,
-            onReward: onReward
+            runtimeContext: runtimeContext
         )
     }
 
@@ -204,12 +207,11 @@ final class RewardedAdService: NSObject, FullScreenContentDelegate {
         placements: [AdsPlacement],
         index: Int,
         rootViewController: UIViewController,
-        runtimeContext: AdsRuntimeContext,
-        onReward: @escaping (AdReward?) -> Void
+        runtimeContext: AdsRuntimeContext
     ) {
         guard placements.indices.contains(index) else {
             finishLoadingRewarded(slot: slot, didLoad: false)
-            onReward(nil)
+            onReward?(nil)
             onDismissed?()
             clearPresentationCallbacks()
             return
@@ -246,15 +248,14 @@ final class RewardedAdService: NSObject, FullScreenContentDelegate {
                         placements: placements,
                         index: index + 1,
                         rootViewController: rootViewController,
-                        runtimeContext: runtimeContext,
-                        onReward: onReward
+                        runtimeContext: runtimeContext
                     )
                     return
                 }
 
                 guard let ad else {
                     self.finishLoadingRewarded(slot: slot, didLoad: false)
-                    onReward(nil)
+                    self.onReward?(nil)
                     self.onDismissed?()
                     self.clearPresentationCallbacks()
                     return
@@ -302,7 +303,7 @@ final class RewardedAdService: NSObject, FullScreenContentDelegate {
                             ]
                         )
                     )
-                    onReward(ad.adReward)
+                    self.pendingReward = ad.adReward
                 }
             }
         }
@@ -333,9 +334,16 @@ final class RewardedAdService: NSObject, FullScreenContentDelegate {
             )
         )
         removeCachedAd(slotKey: activeSlotKey)
-        activeSlotKey = nil
-        onDismissed?()
+
+        let rewardCallback = onReward
+        let dismissedCallback = onDismissed
+        let earnedReward = pendingReward
         clearPresentationCallbacks()
+
+        dismissedCallback?()
+        if let earnedReward {
+            rewardCallback?(earnedReward)
+        }
     }
 
     func ad(
@@ -384,6 +392,8 @@ final class RewardedAdService: NSObject, FullScreenContentDelegate {
         activeSlotKey = nil
         onDismissed = nil
         onShown = nil
+        onReward = nil
+        pendingReward = nil
     }
 
     private func cachedAd(for slot: AdsSlot) -> CachedRewardedAd? {

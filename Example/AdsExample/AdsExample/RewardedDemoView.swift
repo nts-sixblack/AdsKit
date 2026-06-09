@@ -59,14 +59,16 @@ struct RewardedDemoView: View {
           adsManager.showRewarded(
             slotKey: "demo_rewarded",
             onDismissed: {
-              statusMessage = "Ad dismissed. Tap \"Load\" again."
+              statusMessage = "Ad dismissed."
               isLoaded = false
             },
             onReward: { reward in
               if let reward {
                 rewardText = "Earned \(reward.amount) \(reward.type)"
+                statusMessage = "Reward granted after ad closed. Tap \"Load\" again."
               } else {
                 rewardText = "No reward received"
+                statusMessage = "Ad failed before reward. Tap \"Load\" again."
               }
             }
           )

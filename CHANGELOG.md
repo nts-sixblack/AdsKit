@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.14
+
+- Deferred rewarded `onReward` delivery until after the ad is dismissed, so apps receive the reward callback only once the user has closed the fullscreen ad.
+- Preserved immediate `onReward(nil)` behavior for pre-present failure paths such as missing root view controller, disabled placements, or load failures.
+- Kept `reward_earned` analytics recording at the SDK earn moment while delivering the app callback after `onDismissed`.
+
 ## 1.0.13
 
 - Fixed `NativeAdViewStyle.banner` so it no longer registers a `MediaView`, preventing Google Mobile Ads video warnings when compact native banner layouts are too small for video media.
